@@ -1,0 +1,11 @@
+targets:
+  $default:
+    builders:
+      drift_dev:
+        options:
+          # Search is FTS5; drift only analyses the virtual table if the module
+          # is declared here.
+          sqlite:
+            version: "3.45"
+            modules:
+              - fts5

@@ -1,0 +1,35 @@
+-- Full-text index over everything a search can match. Kept in sync by triggers
+-- so no write path can forget to update it.
+CREATE VIRTUAL TABLE links_fts USING fts5(
+  title,
+  note,
+  url,
+  meta
+);
+
+CREATE TRIGGER IF NOT EXISTS links_fts_insert AFTER INSERT ON links BEGIN
+  INSERT INTO links_fts (rowid, title, note, url, meta)
+  VALUES (
+    new.id,
+    new.title,
+    new.note,
+    new.url,
+    coalesce(new.site_name, '') || ' ' || coalesce(new.description, '')
+  );
+END;
+
+CREATE TRIGGER IF NOT EXISTS links_fts_delete AFTER DELETE ON links BEGIN
+  DELETE FROM links_fts WHERE rowid = old.id;
+END;
+
+CREATE TRIGGER IF NOT EXISTS links_fts_update AFTER UPDATE ON links BEGIN
+  DELETE FROM links_fts WHERE rowid = old.id;
+  INSERT INTO links_fts (rowid, title, note, url, meta)
+  VALUES (
+    new.id,
+    new.title,
+    new.note,
+    new.url,
+    coalesce(new.site_name, '') || ' ' || coalesce(new.description, '')
+  );
+END;
