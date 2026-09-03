@@ -8,6 +8,8 @@ import '../../core/theme/app_theme.dart';
 import '../../core/theme/palette.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/theme/typography.dart';
+import '../../shared/widgets/perch_icons.dart';
+import '../stats/stats_providers.dart';
 import 'about_screen.dart';
 import 'appearance_screen.dart';
 import 'dev_tools_screen.dart';
@@ -40,6 +42,7 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
     final PerchColors c = context.colors;
     final AppSettings s = ref.watch(settingsProvider);
     final SettingsController controller = ref.read(settingsProvider.notifier);
+    final int? tagCount = ref.watch(statsProvider).valueOrNull?.tags;
 
     return SafeArea(
       bottom: false,
@@ -62,17 +65,26 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
           SettingsGroup(
             label: 'General',
             children: <Widget>[
-              SettingsRow(
-                icon: Icons.flag_outlined,
+              SettingsChoiceRow<LandingTab>(
                 label: 'Open on launch',
-                trailing: SegmentedChoice<LandingTab>(
-                  options: const <(LandingTab, String, IconData)>[
-                    (LandingTab.links, 'Links', Icons.link_rounded),
-                    (LandingTab.folders, 'Folders', Icons.folder_outlined),
-                  ],
-                  selected: s.landingTab,
-                  onChanged: controller.setLandingTab,
-                ),
+                value:
+                    'Default · '
+                    '${s.landingTab == LandingTab.folders ? 'Folders' : 'Links'}',
+                selected: s.landingTab,
+                onChanged: controller.setLandingTab,
+                // The nav's own glyphs, so the row and the destination match.
+                options: <(LandingTab, String, Widget Function(Color))>[
+                  (
+                    LandingTab.links,
+                    'Links',
+                    (Color c) => PerchIcon(PerchGlyph.links, color: c),
+                  ),
+                  (
+                    LandingTab.folders,
+                    'Folders',
+                    (Color c) => PerchIcon(PerchGlyph.folders, color: c),
+                  ),
+                ],
               ),
               SettingsRow(
                 icon: Icons.view_agenda_outlined,
@@ -100,6 +112,7 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
               SettingsRow(
                 icon: Icons.sell_outlined,
                 label: 'Tags',
+                value: tagCount == null ? null : '$tagCount',
                 onTap: () => _push(const TagsScreen()),
               ),
               SettingsRow(

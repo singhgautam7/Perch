@@ -82,32 +82,42 @@ class AppButton extends StatelessWidget {
       ],
     );
 
+    final bool dashed = type == AppButtonType.dotted && !disabled;
+    Widget button = SizedBox(
+      height: height,
+      width: fullWidth ? double.infinity : null,
+      child: Material(
+        color: skin.bg,
+        shape: StadiumBorder(
+          side: skin.border == null || dashed
+              ? BorderSide.none
+              : BorderSide(color: skin.border!),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: disabled ? null : onPressed,
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: compact ? 13 : 22),
+            child: content,
+          ),
+        ),
+      ),
+    );
+
+    // The dashes belong to the button's own outline, so they are painted around
+    // it rather than around its label.
+    if (dashed) {
+      button = CustomPaint(
+        foregroundPainter: _DashedPainter(skin.border!),
+        child: button,
+      );
+    }
+
     return Semantics(
       button: true,
       enabled: !disabled,
       label: label,
-      child: SizedBox(
-        height: height,
-        width: fullWidth ? double.infinity : null,
-        child: Material(
-          color: skin.bg,
-          shape: StadiumBorder(
-            side: skin.border == null
-                ? BorderSide.none
-                : BorderSide(color: skin.border!),
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            onTap: disabled ? null : onPressed,
-            child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: compact ? 13 : 22),
-              child: type == AppButtonType.dotted
-                  ? _Dashed(color: skin.border!, child: content)
-                  : content,
-            ),
-          ),
-        ),
-      ),
+      child: button,
     );
   }
 
@@ -148,18 +158,7 @@ class _ButtonSkin {
   final Color? border;
 }
 
-/// A dashed stadium outline, painted behind the label.
-class _Dashed extends StatelessWidget {
-  const _Dashed({required this.color, required this.child});
-
-  final Color color;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) =>
-      CustomPaint(painter: _DashedPainter(color), child: child);
-}
-
+/// A dashed stadium outline.
 class _DashedPainter extends CustomPainter {
   const _DashedPainter(this.color);
 

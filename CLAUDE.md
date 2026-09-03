@@ -20,8 +20,10 @@ flutter run                                              # run on a device
 flutter analyze                                          # lints must stay clean
 flutter test                                             # unit + widget tests
 dart run build_runner build --delete-conflicting-outputs # Drift codegen
+flutter test tool/generate_icons_test.dart               # redraw the icon art
 dart run flutter_launcher_icons                          # launcher icon
 dart run flutter_native_splash:create                    # splash
+flutter test --update-goldens test/goldens               # refresh goldens
 flutter build apk --release
 ```
 

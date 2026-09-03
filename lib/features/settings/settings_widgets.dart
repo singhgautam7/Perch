@@ -80,12 +80,16 @@ class SettingsRow extends StatelessWidget {
     final PerchColors c = context.colors;
     final Widget content = Padding(
       padding: const EdgeInsets.symmetric(horizontal: 15),
-      child: SizedBox(
-        height: 56,
+      // Rows grow vertically under OS text scale; they never clip.
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 56),
         child: Row(
           spacing: 13,
           children: <Widget>[
-            Icon(icon, size: 20, color: c.icon),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: Space.lg),
+              child: Icon(icon, size: 20, color: c.icon),
+            ),
             Expanded(
               child: Text(
                 label,
@@ -126,68 +130,109 @@ class SettingsRow extends StatelessWidget {
   }
 }
 
-/// A two-option segmented control. Two choices do not earn a screen.
-class SegmentedChoice<T> extends StatelessWidget {
-  const SegmentedChoice({
+/// A row whose choice is made in place: the label with its current default in
+/// mono on the right, and a full-width two-option control underneath.
+///
+/// Two choices do not earn a screen (board 2e), and the icons make the choice
+/// legible without reading.
+class SettingsChoiceRow<T> extends StatelessWidget {
+  const SettingsChoiceRow({
+    required this.label,
+    required this.value,
     required this.options,
     required this.selected,
     required this.onChanged,
     super.key,
   });
 
-  final List<(T, String, IconData)> options;
+  final String label;
+
+  /// Shown in mono on the right, matching every other row on this hub.
+  final String value;
+  final List<(T, String, Widget Function(Color))> options;
   final T selected;
   final ValueChanged<T> onChanged;
 
   @override
   Widget build(BuildContext context) {
     final PerchColors c = context.colors;
-    return Container(
-      height: 38,
-      padding: const EdgeInsets.all(Space.xs),
-      decoration: BoxDecoration(
-        color: c.surfaceContainerHigh,
-        borderRadius: Radii.fullR,
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(15, 14, 15, 15),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          for (final (T, String, IconData) o in options)
-            Semantics(
-              button: true,
-              selected: o.$1 == selected,
-              child: InkWell(
-                onTap: () => onChanged(o.$1),
-                borderRadius: Radii.fullR,
-                child: AnimatedContainer(
-                  duration: Motion.of(context, Motion.fast),
-                  padding: const EdgeInsets.symmetric(horizontal: Space.md),
-                  decoration: BoxDecoration(
-                    color: o.$1 == selected ? c.surface : Colors.transparent,
-                    borderRadius: Radii.fullR,
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    spacing: 6,
-                    children: <Widget>[
-                      Icon(
-                        o.$3,
-                        size: 15,
-                        color: o.$1 == selected ? c.onSurface : c.iconMuted,
-                      ),
-                      Text(
-                        o.$2,
-                        style: PerchType.label.copyWith(
-                          color: o.$1 == selected
-                              ? c.onSurface
-                              : c.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: <Widget>[
+              Expanded(
+                child: Text(
+                  label,
+                  style: PerchType.titleMedium.copyWith(
+                    fontWeight: FontWeight.w500,
+                    color: c.onSurface,
                   ),
                 ),
               ),
+              Text(
+                value.toUpperCase(),
+                style: PerchType.monoLabel.copyWith(color: c.onSurfaceVariant),
+              ),
+            ],
+          ),
+          const SizedBox(height: 11),
+          Container(
+            height: 42,
+            padding: const EdgeInsets.all(Space.xs),
+            decoration: BoxDecoration(
+              color: c.surfaceContainerHigh,
+              borderRadius: Radii.fullR,
             ),
+            child: Row(
+              children: <Widget>[
+                for (final (T, String, Widget Function(Color)) o in options)
+                  Expanded(
+                    child: Semantics(
+                      button: true,
+                      selected: o.$1 == selected,
+                      child: InkWell(
+                        onTap: () => onChanged(o.$1),
+                        borderRadius: Radii.fullR,
+                        child: AnimatedContainer(
+                          duration: Motion.of(context, Motion.fast),
+                          decoration: BoxDecoration(
+                            color: o.$1 == selected
+                                ? c.primaryContainer
+                                : Colors.transparent,
+                            borderRadius: Radii.fullR,
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            spacing: 7,
+                            children: <Widget>[
+                              o.$3(
+                                o.$1 == selected ? c.onPrimaryContainer : c.iconMuted,
+                              ),
+                              Text(
+                                o.$2,
+                                style: PerchType.label
+                                    .copyWith(
+                                      fontSize: 13,
+                                      color: o.$1 == selected
+                                          ? c.onPrimaryContainer
+                                          : c.iconMuted,
+                                    )
+                                    .weight(o.$1 == selected ? 600 : 500),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
         ],
       ),
     );

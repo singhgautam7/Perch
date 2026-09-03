@@ -78,17 +78,32 @@ class TagChip extends StatelessWidget {
             GestureDetector(
               onTap: onRemove,
               behavior: HitTestBehavior.opaque,
-              child: Icon(Icons.close_rounded, size: 13, color: fg),
+              child: Semantics(
+                button: true,
+                label: 'Remove $label',
+                // The glyph stays 13px; the target around it does not.
+                child: SizedBox(
+                  width: 26,
+                  height: 26,
+                  child: Icon(Icons.close_rounded, size: 13, color: fg),
+                ),
+              ),
             ),
         ],
       ),
     );
 
-    if (onTap == null) return chip;
+    // A chip that can be acted on carries a 48dp row, even though it only
+    // paints 30 (board 1j, TOUCH TARGETS).
+    final Widget sized = onTap == null && onRemove == null
+        ? chip
+        : SizedBox(height: IconSpec.tapTarget, child: Center(child: chip));
+
+    if (onTap == null) return sized;
     return Semantics(
       button: true,
       label: label,
-      child: InkWell(onTap: onTap, borderRadius: shape, child: chip),
+      child: InkWell(onTap: onTap, borderRadius: shape, child: sized),
     );
   }
 }

@@ -174,9 +174,10 @@ class _More extends StatelessWidget {
         ],
       ),
     );
+    // The two 8px slider rows stack flush: that puts the bars 8 apart, which
+    // is the board's 2px bar + 6px gap, and keeps the mark inside its 16px box.
     return Column(
       mainAxisSize: MainAxisSize.min,
-      spacing: 2,
       children: <Widget>[
         slider(knobOnLeft: true),
         slider(knobOnLeft: false),

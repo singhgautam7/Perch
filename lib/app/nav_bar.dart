@@ -1,4 +1,10 @@
+import 'dart:ui' show ImageFilter;
+
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../core/db/settings_repository.dart';
+import '../core/providers.dart';
 
 import '../core/theme/app_theme.dart';
 import '../core/theme/palette.dart';
@@ -26,7 +32,7 @@ const List<NavDestination> kDestinations = <NavDestination>[
 ///
 /// The tinted indicator travels to the tapped tab and the label fades up as it
 /// arrives; under reduced motion the pill jumps and the label cross-fades.
-class PerchNavPill extends StatelessWidget {
+class PerchNavPill extends ConsumerWidget {
   const PerchNavPill({
     required this.index,
     required this.onSelect,
@@ -37,36 +43,66 @@ class PerchNavPill extends StatelessWidget {
   final ValueChanged<int> onSelect;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final PerchColors c = context.colors;
+    // The nav renders opaque by default. Blur is the one real GPU cost in the
+    // app, so it only happens behind the explicit Appearance toggle.
+    final bool blur = ref.watch(
+      settingsProvider.select((AppSettings s) => s.blur),
+    );
+
     return RepaintBoundary(
-      child: Container(
-        height: 56,
-        padding: const EdgeInsets.all(Space.sm),
-        decoration: BoxDecoration(
-          color: c.surface,
-          borderRadius: Radii.fullR,
-          border: Border.all(color: c.outline),
-          boxShadow: <BoxShadow>[
-            BoxShadow(
-              color: c.shadow,
-              blurRadius: 18,
-              offset: const Offset(0, Elevations.navPill),
-            ),
-          ],
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          spacing: 2,
-          children: <Widget>[
-            for (int i = 0; i < kDestinations.length; i++)
-              _NavItem(
-                destination: kDestinations[i],
-                selected: i == index,
-                onTap: () => onSelect(i),
+      child: _MaybeBlurred(
+        enabled: blur,
+        child: Container(
+          height: 56,
+          padding: const EdgeInsets.all(Space.sm),
+          decoration: BoxDecoration(
+            color: blur ? c.surface.withValues(alpha: 0.72) : c.surface,
+            borderRadius: Radii.fullR,
+            border: Border.all(color: c.outline),
+            boxShadow: <BoxShadow>[
+              BoxShadow(
+                color: c.shadow,
+                blurRadius: 18,
+                offset: const Offset(0, Elevations.navPill),
               ),
-          ],
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            spacing: 2,
+            children: <Widget>[
+              for (int i = 0; i < kDestinations.length; i++)
+                _NavItem(
+                  destination: kDestinations[i],
+                  selected: i == index,
+                  onTap: () => onSelect(i),
+                ),
+            ],
+          ),
         ),
+      ),
+    );
+  }
+}
+
+/// Wraps [child] in a backdrop blur only when the toggle is on — a
+/// `BackdropFilter` that is always in the tree costs whether or not it blurs.
+class _MaybeBlurred extends StatelessWidget {
+  const _MaybeBlurred({required this.enabled, required this.child});
+
+  final bool enabled;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!enabled) return child;
+    return ClipRRect(
+      borderRadius: Radii.fullR,
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+        child: child,
       ),
     );
   }
@@ -86,9 +122,11 @@ class _NavItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final PerchColors c = context.colors;
-    final Color glyphColor = selected
-        ? c.onPrimaryContainer
-        : c.iconMuted;
+    final Color glyphColor = selected ? c.onPrimaryContainer : c.iconMuted;
+    // Under a large OS text scale the nav labels drop first; the glyphs and the
+    // indicator still say where you are.
+    final bool showLabel =
+        selected && MediaQuery.textScalerOf(context).scale(13.5) <= 20;
 
     return Semantics(
       button: true,
@@ -102,8 +140,8 @@ class _NavItem extends StatelessWidget {
           curve: Motion.curveOf(context, Motion.spring),
           height: 40,
           padding: EdgeInsets.only(
-            left: selected ? 11 : 8,
-            right: selected ? 14 : 8,
+            left: showLabel ? 11 : 8,
+            right: showLabel ? 14 : 8,
           ),
           decoration: BoxDecoration(
             color: selected ? c.primaryContainer : Colors.transparent,
@@ -111,7 +149,7 @@ class _NavItem extends StatelessWidget {
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
-            spacing: selected ? Space.sm : 0,
+            spacing: showLabel ? Space.sm : 0,
             children: <Widget>[
               PerchIcon(
                 destination.glyph,
@@ -124,7 +162,7 @@ class _NavItem extends StatelessWidget {
               AnimatedSize(
                 duration: Motion.of(context, Motion.navIndicator),
                 curve: Motion.curveOf(context, Motion.spring),
-                child: selected
+                child: showLabel
                     ? Text(
                         destination.label,
                         style: PerchType.titleSmall.copyWith(
