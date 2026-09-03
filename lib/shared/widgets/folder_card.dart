@@ -138,21 +138,21 @@ class FolderRow extends StatelessWidget {
       label: '${summary.folder.name}, $counts',
       child: Material(
         color: c.surfaceContainer,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(18),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,
           onLongPress: onLongPress,
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 14),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(18),
               border: Border.all(color: c.outline),
             ),
             child: Row(
-              spacing: Space.md,
+              spacing: 13,
               children: <Widget>[
-                FolderGlyph(color: c.primary, width: 23),
+                FolderGlyph(color: c.primary, width: 26),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
