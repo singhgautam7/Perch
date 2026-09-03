@@ -89,6 +89,39 @@ void main() {
     expect((await search.search(query: 'After')), isEmpty);
   });
 
+  test('search counts match what search returns', () async {
+    for (int i = 0; i < 5; i++) {
+      await links.create(url: 'https://a.test/$i', title: 'Item $i');
+    }
+    expect(await search.count(), 5);
+    expect((await search.search(limit: 2)).length, 2);
+    expect(await search.count(query: 'Item'), 5);
+    expect(await search.count(query: 'Item 3'), 1);
+  });
+
+  test('tag AND requires every tag, OR requires one', () async {
+    final int both = await links.create(url: 'https://a.test/both');
+    final int one = await links.create(url: 'https://a.test/one');
+    await tags.setForLink(both, <String>['ml', 'reference']);
+    await tags.setForLink(one, <String>['ml']);
+
+    final List<Tag> all = await tags.forLink(both);
+    final Set<int> ids = all.map((Tag t) => t.id).toSet();
+
+    expect(
+      (await search.search(
+        filters: SearchFilters(tagIds: ids, tagMatch: TagMatch.all),
+      )).single.link.id,
+      both,
+    );
+    expect(
+      (await search.search(
+        filters: SearchFilters(tagIds: ids),
+      )).length,
+      2,
+    );
+  });
+
   test('search filters combine', () async {
     final int f = await folders.create(name: 'Reading');
     final int withNote = await links.create(

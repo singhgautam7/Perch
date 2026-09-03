@@ -8,16 +8,16 @@ enum TagMatch { any, all }
 
 enum DatePreset {
   anyTime,
-  last7Days,
-  last30Days,
-  thisYear,
+  today,
+  thisWeek,
+  thisMonth,
   custom;
 
   String get label => switch (this) {
     DatePreset.anyTime => 'Any time',
-    DatePreset.last7Days => 'Last 7 days',
-    DatePreset.last30Days => 'Last 30 days',
-    DatePreset.thisYear => 'This year',
+    DatePreset.today => 'Today',
+    DatePreset.thisWeek => 'This week',
+    DatePreset.thisMonth => 'This month',
     DatePreset.custom => 'Custom range',
   };
 }
@@ -105,63 +105,19 @@ class SearchRepository {
     int offset = 0,
     List<int>? folderScope,
   }) async {
-    final List<String> where = <String>[];
-    final List<Variable<Object>> vars = <Variable<Object>>[];
-    final String from = query.trim().isEmpty
-        ? 'links l'
-        : 'links l JOIN links_fts f ON f.rowid = l.id';
-
-    if (query.trim().isNotEmpty) {
-      where.add('links_fts MATCH ?');
-      vars.add(Variable<String>(_toMatchQuery(query)));
-    }
-
-    if (filters.folderId != null) {
-      final List<int> ids = folderScope ?? <int>[filters.folderId!];
-      where.add('l.folder_id IN (${List<String>.filled(ids.length, '?').join(',')})');
-      vars.addAll(ids.map((int id) => Variable<int>(id)));
-    }
-    if (filters.hasNote) where.add("trim(l.note) != ''");
-    if (filters.hasImage) where.add('l.image_url IS NOT NULL');
-    if (filters.domain != null) {
-      where.add('l.url LIKE ?');
-      vars.add(Variable<String>('%${filters.domain}%'));
-    }
-    final (DateTime?, DateTime?) range = _range(filters);
-    if (range.$1 != null) {
-      where.add('l.created_at >= ?');
-      vars.add(Variable<DateTime>(range.$1!));
-    }
-    if (range.$2 != null) {
-      where.add('l.created_at <= ?');
-      vars.add(Variable<DateTime>(range.$2!));
-    }
-    if (filters.tagIds.isNotEmpty) {
-      final String placeholders =
-          List<String>.filled(filters.tagIds.length, '?').join(',');
-      if (filters.tagMatch == TagMatch.all) {
-        where.add(
-          'l.id IN (SELECT link_id FROM link_tags WHERE tag_id IN ($placeholders) '
-          'GROUP BY link_id HAVING COUNT(DISTINCT tag_id) = ${filters.tagIds.length})',
-        );
-      } else {
-        where.add(
-          'l.id IN (SELECT link_id FROM link_tags WHERE tag_id IN ($placeholders))',
-        );
-      }
-      vars.addAll(filters.tagIds.map((int id) => Variable<int>(id)));
-    }
-
+    final _Predicate p = _predicate(query, filters, folderScope);
     final String sql =
-        'SELECT l.* FROM $from'
-        '${where.isEmpty ? '' : ' WHERE ${where.join(' AND ')}'}'
+        'SELECT l.* FROM ${p.from}${p.whereSql}'
         ' ORDER BY ${_orderSql(filters.sort)} LIMIT ? OFFSET ?';
-    vars.addAll(<Variable<int>>[Variable<int>(limit), Variable<int>(offset)]);
 
     final List<QueryRow> rows = await _db
         .customSelect(
           sql,
-          variables: vars,
+          variables: <Variable<Object>>[
+            ...p.variables,
+            Variable<int>(limit),
+            Variable<int>(offset),
+          ],
           readsFrom: <ResultSetImplementation<HasResultSet, dynamic>>{
             _db.links,
             _db.linkTags,
@@ -174,6 +130,90 @@ class SearchRepository {
     );
   }
 
+  /// How many links match — the live number on the filter sheet's Apply button.
+  /// Counts in SQL rather than paging rows in to be counted.
+  Future<int> count({
+    String query = '',
+    SearchFilters filters = const SearchFilters(),
+    List<int>? folderScope,
+  }) async {
+    final _Predicate p = _predicate(query, filters, folderScope);
+    final QueryRow row = await _db
+        .customSelect(
+          'SELECT COUNT(*) AS c FROM ${p.from}${p.whereSql}',
+          variables: p.variables,
+          readsFrom: <ResultSetImplementation<HasResultSet, dynamic>>{
+            _db.links,
+            _db.linkTags,
+          },
+        )
+        .getSingle();
+    return row.read<int>('c');
+  }
+
+  /// The FROM and WHERE that both the page query and the count query share.
+  _Predicate _predicate(
+    String query,
+    SearchFilters filters,
+    List<int>? folderScope,
+  ) {
+    final List<String> where = <String>[];
+    final List<Variable<Object>> vars = <Variable<Object>>[];
+    final bool hasQuery = query.trim().isNotEmpty;
+    final String from = hasQuery
+        ? 'links l JOIN links_fts f ON f.rowid = l.id'
+        : 'links l';
+
+    if (hasQuery) {
+      where.add('links_fts MATCH ?');
+      vars.add(Variable<String>(_toMatchQuery(query)));
+    }
+
+    if (filters.folderId != null) {
+      final List<int> ids = folderScope ?? <int>[filters.folderId!];
+      where.add(
+        'l.folder_id IN (${List<String>.filled(ids.length, '?').join(',')})',
+      );
+      vars.addAll(ids.map((int id) => Variable<int>(id)));
+    }
+    if (filters.hasNote) where.add("trim(l.note) != ''");
+    if (filters.hasImage) where.add('l.image_url IS NOT NULL');
+    if (filters.domain != null) {
+      where.add('l.url LIKE ?');
+      vars.add(Variable<String>('%${filters.domain}%'));
+    }
+
+    final (DateTime?, DateTime?) range = _range(filters);
+    if (range.$1 != null) {
+      where.add('l.created_at >= ?');
+      vars.add(Variable<DateTime>(range.$1!));
+    }
+    if (range.$2 != null) {
+      where.add('l.created_at <= ?');
+      vars.add(Variable<DateTime>(range.$2!));
+    }
+
+    if (filters.tagIds.isNotEmpty) {
+      final String placeholders =
+          List<String>.filled(filters.tagIds.length, '?').join(',');
+      where.add(
+        filters.tagMatch == TagMatch.all
+            ? 'l.id IN (SELECT link_id FROM link_tags WHERE tag_id IN '
+                  '($placeholders) GROUP BY link_id '
+                  'HAVING COUNT(DISTINCT tag_id) = ${filters.tagIds.length})'
+            : 'l.id IN (SELECT link_id FROM link_tags WHERE tag_id IN '
+                  '($placeholders))',
+      );
+      vars.addAll(filters.tagIds.map((int id) => Variable<int>(id)));
+    }
+
+    return _Predicate(
+      from: from,
+      whereSql: where.isEmpty ? '' : ' WHERE ${where.join(' AND ')}',
+      variables: vars,
+    );
+  }
+
   static String _orderSql(LinkSort sort) => switch (sort) {
     LinkSort.newest => 'l.created_at DESC',
     LinkSort.oldest => 'l.created_at ASC',
@@ -183,11 +223,17 @@ class SearchRepository {
 
   static (DateTime?, DateTime?) _range(SearchFilters f) {
     final DateTime now = DateTime.now();
+    final DateTime midnight = DateTime(now.year, now.month, now.day);
     return switch (f.datePreset) {
       DatePreset.anyTime => (null, null),
-      DatePreset.last7Days => (now.subtract(const Duration(days: 7)), null),
-      DatePreset.last30Days => (now.subtract(const Duration(days: 30)), null),
-      DatePreset.thisYear => (DateTime(now.year), null),
+      DatePreset.today => (midnight, null),
+      // The week and month so far, not a rolling window — "this week" is a
+      // calendar claim.
+      DatePreset.thisWeek => (
+        midnight.subtract(Duration(days: now.weekday - 1)),
+        null,
+      ),
+      DatePreset.thisMonth => (DateTime(now.year, now.month), null),
       DatePreset.custom => (f.from, f.to),
     };
   }
@@ -216,4 +262,18 @@ class SearchRepository {
       ..sort((String a, String b) => counts[b]!.compareTo(counts[a]!));
     return sorted.take(limit).toList(growable: false);
   }
+}
+
+class _Predicate {
+  const _Predicate({
+    required this.from,
+    required this.whereSql,
+    required this.variables,
+  });
+
+  final String from;
+
+  /// Already carries its leading ` WHERE `, or is empty.
+  final String whereSql;
+  final List<Variable<Object>> variables;
 }
