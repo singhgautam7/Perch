@@ -17,24 +17,12 @@ abstract final class AppTheme {
     });
   }
 
-  /// Android dynamic color: the OS hands us a seed, the rest of the role map is
-  /// derived exactly as a bundled family would be.
-  static ThemeData dynamic_(ColorScheme scheme, Tone tone) {
-    return _build(_fromScheme(scheme, tone), tone != Tone.light);
-  }
-
-  static PerchColors _fromScheme(ColorScheme scheme, Tone tone) {
-    final PerchColors base = ThemeFamily.perch.colors(tone);
-    return base.copyWith(
-      primary: scheme.primary,
-      primaryPressed: Color.lerp(scheme.primary, scheme.onPrimary, 0.12),
-      primaryContainer: scheme.primaryContainer,
-      onPrimary: scheme.onPrimary,
-      onPrimaryContainer: scheme.onPrimaryContainer,
-      accent: tone == Tone.light
-          ? Color.lerp(scheme.primary, scheme.onPrimaryContainer, 0.4)
-          : scheme.primary,
-    );
+  /// Android dynamic color, keyed by the wallpaper seed so it caches like any
+  /// other theme.
+  static ThemeData fromSeed(Color seed, Tone tone) {
+    return _cache.putIfAbsent('seed:${seed.toARGB32()}:${tone.name}', () {
+      return _build(ThemeFamily.fromSeed(seed).colors(tone), tone != Tone.light);
+    });
   }
 
   static ThemeData _build(PerchColors c, bool isDark) {

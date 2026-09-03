@@ -262,6 +262,24 @@ class ThemeFamily {
   static ThemeFamily byId(String id) =>
       all.firstWhere((ThemeFamily f) => f.id == id, orElse: () => perch);
 
+  /// Android hands over one wallpaper accent; the rest of the role map is
+  /// derived exactly as a bundled family's is, so the two never diverge.
+  static ThemeFamily fromSeed(Color seed) {
+    final double hue = Oklch.hueOf(seed);
+    return ThemeFamily(
+      id: 'dynamic',
+      name: 'Dynamic',
+      blurb: 'wallpaper',
+      neutralHue: hue,
+      neutralChroma: 1,
+      primaryHue: hue,
+      primaryLightness: 0.55,
+      primaryChroma: 0.14,
+      primaryContainerChroma: 0.045,
+      hasAmoled: true,
+    );
+  }
+
   PerchColors colors(Tone tone) =>
       tone == Tone.light ? _light() : _dark(amoled: tone == Tone.amoled);
 

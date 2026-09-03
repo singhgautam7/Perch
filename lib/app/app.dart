@@ -8,6 +8,7 @@ import '../core/db/settings_repository.dart';
 import '../core/providers.dart';
 import '../core/router/router.dart';
 import '../core/services/share_intake.dart';
+import '../core/services/wallpaper_seed.dart';
 import '../core/theme/app_theme.dart';
 import '../core/theme/palette.dart';
 import '../shared/widgets/app_snackbar.dart';
@@ -85,8 +86,15 @@ class _PerchAppState extends ConsumerState<PerchApp> {
     );
   }
 
+  /// Dynamic color takes the seed from the OS; every other role is derived
+  /// exactly as a bundled family's would be, so the two never diverge.
   ThemeData _themeFor(AppSettings s, Brightness brightness) {
     final Tone tone = s.toneFor(brightness);
-    return AppTheme.of(s.family, tone);
+    final Color? seed = s.dynamicColor
+        ? ref.watch(wallpaperSeedProvider).valueOrNull
+        : null;
+    return seed == null
+        ? AppTheme.of(s.family, tone)
+        : AppTheme.fromSeed(seed, tone);
   }
 }

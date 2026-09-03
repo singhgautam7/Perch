@@ -1,6 +1,7 @@
 package com.grs.perch
 
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -41,6 +42,7 @@ class MainActivity : FlutterActivity() {
                         // Consumed — a later restart must not re-save it.
                         pending = null
                     }
+                    "getWallpaperAccent" -> result.success(wallpaperAccent())
                     else -> result.notImplemented()
                 }
             }
@@ -65,6 +67,16 @@ class MainActivity : FlutterActivity() {
         val text = extractSharedText(intent) ?: return
         val sink = events
         if (sink != null) sink.success(text) else pending = text
+    }
+
+    /**
+     * The wallpaper accent Material You derives, or null below Android 12 where
+     * the system palette does not exist. Perch derives the rest of its role map
+     * from this one colour.
+     */
+    private fun wallpaperAccent(): Int? {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return null
+        return resources.getColor(android.R.color.system_accent1_500, theme)
     }
 
     private fun extractSharedText(intent: Intent?): String? {
