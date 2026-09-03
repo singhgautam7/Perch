@@ -48,10 +48,9 @@ class LinksScreen extends ConsumerWidget {
               children: <Widget>[
                 Expanded(
                   child: Text(
-                    'Perch',
-                    style: PerchType.display.copyWith(
-                      fontSize: 25,
-                      height: 1,
+                    'Links',
+                    style: PerchType.title.copyWith(
+                      fontSize: 22,
                       color: c.onSurface,
                     ),
                   ),
@@ -76,30 +75,33 @@ class LinksScreen extends ConsumerWidget {
               trailing: _SortControl(sort: sort),
             ),
           Expanded(
-            child: feed.when(
-              loading: () => const ListSkeleton(),
-              error: (Object e, StackTrace _) =>
-                  ErrorStateView(message: '$e', onRetry: () => ref.invalidate(
-                    linkFeedProvider(kAllLinks),
-                  )),
-              data: (LinkFeed data) => data.items.isEmpty
-                  ? EmptyState(
-                      title: 'Nothing perched yet',
-                      message:
-                          'Share a link from any app and it lands here. '
-                          'Or tap ＋ to paste one.',
-                      actionLabel: 'Add your first link',
-                      onAction: () => context.push(Routes.add),
-                    )
-                  : LinkList(
-                      feed: data,
-                      mode: mode,
-                      paths: ref.watch(folderPathsProvider),
-                      onLoadMore: () => ref
-                          .read(linkFeedProvider(kAllLinks).notifier)
-                          .loadMore(),
-                    ),
-            ),
+            // A save re-runs the feed; keeping the last page on screen while it
+            // reloads stops the whole list flashing skeletons on every write.
+            child: switch (feed) {
+              AsyncValue<LinkFeed>(:final LinkFeed value?) =>
+                value.items.isEmpty
+                    ? EmptyState(
+                        title: 'Nothing perched yet',
+                        message:
+                            'Share a link from any app and it lands here. '
+                            'Or tap ＋ to paste one.',
+                        actionLabel: 'Add your first link',
+                        onAction: () => context.push(Routes.add),
+                      )
+                    : LinkList(
+                        feed: value,
+                        mode: mode,
+                        paths: ref.watch(folderPathsProvider),
+                        onLoadMore: () => ref
+                            .read(linkFeedProvider(kAllLinks).notifier)
+                            .loadMore(),
+                      ),
+              AsyncValue<LinkFeed>(:final Object error?) => ErrorStateView(
+                message: '$error',
+                onRetry: () => ref.invalidate(linkFeedProvider(kAllLinks)),
+              ),
+              _ => const ListSkeleton(),
+            },
           ),
         ],
       ),
@@ -140,26 +142,16 @@ Future<void> showSortSheet(
   BuildContext context,
   WidgetRef ref,
   LinkSort current,
-) {
-  return showAppBottomSheet<void>(
+) async {
+  final LinkSort? picked = await showOptionSheet<LinkSort>(
     context: context,
-    title: 'Sort',
-    builder: (BuildContext sheetContext) => Column(
-      mainAxisSize: MainAxisSize.min,
-      children: <Widget>[
-        for (final LinkSort option in LinkSort.values)
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            title: Text(option.label, style: PerchType.body),
-            trailing: option == current
-                ? Icon(Icons.check_rounded, color: sheetContext.colors.accent)
-                : null,
-            onTap: () {
-              ref.read(settingsProvider.notifier).setSort(option);
-              Navigator.of(sheetContext).pop();
-            },
-          ),
-      ],
-    ),
+    title: 'Sort links',
+    icon: Icons.swap_vert_rounded,
+    selected: current,
+    options: <SheetOption<LinkSort>>[
+      for (final LinkSort option in LinkSort.values)
+        SheetOption<LinkSort>(value: option, label: option.label),
+    ],
   );
+  if (picked != null) await ref.read(settingsProvider.notifier).setSort(picked);
 }

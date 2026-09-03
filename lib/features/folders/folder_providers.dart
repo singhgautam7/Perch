@@ -1,15 +1,34 @@
+import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/db/database.dart';
 import '../../core/db/folder_repository.dart';
+import '../../core/db/settings_repository.dart';
 import '../../core/providers.dart';
 import '../../shared/widgets/breadcrumb.dart';
 
-/// Children of a location, with their counts.
+/// Children of a location, with their counts, in the chosen order.
 final StreamProviderFamily<List<FolderSummary>, int?> folderChildrenProvider =
     StreamProvider.family<List<FolderSummary>, int?>((Ref ref, int? parentId) {
-      return ref.watch(folderRepositoryProvider).watchChildren(parentId);
+      final FolderSort sort = ref.watch(
+        settingsProvider.select((AppSettings s) => s.folderSort),
+      );
+      return ref
+          .watch(folderRepositoryProvider)
+          .watchChildren(parentId, sort: sort);
     });
+
+/// How many folders exist in total — the count in the Folders header.
+final StreamProvider<int> folderCountProvider = StreamProvider<int>((Ref ref) {
+  final PerchDatabase db = ref.watch(databaseProvider);
+  return db
+      .customSelect(
+        'SELECT COUNT(*) AS c FROM folders',
+        readsFrom: <ResultSetImplementation<HasResultSet, dynamic>>{db.folders},
+      )
+      .watch()
+      .map((List<QueryRow> rows) => rows.first.read<int>('c'));
+});
 
 /// Every folder, flat. Folders are few, so one watch feeds the picker, the
 /// path map and the stats screen.

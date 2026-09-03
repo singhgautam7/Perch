@@ -10,8 +10,8 @@ import '../../core/theme/typography.dart';
 
 enum SnackVariant { info, success, warning, error }
 
-/// Which edge the snackbar is anchored to. The anchor decides which way a
-/// vertical swipe dismisses it.
+/// Which edge the strip is anchored to. The anchor decides which way a vertical
+/// swipe dismisses it.
 enum SnackPosition { top, bottom }
 
 class SnackMessage {
@@ -32,19 +32,39 @@ class SnackMessage {
   final VoidCallback? onAction;
 }
 
-/// Perch's own snackbar. Flutter's cannot be anchored to the top or dismissed
-/// by a directional swipe, and both are in the spec.
+/// Board 1e — the undo strip. An inverse-surface bar with a round status mark,
+/// one line, and an optional action. There is no dialog anywhere in this flow.
 ///
-/// One is visible at a time; the rest queue behind it.
+/// Flutter's own snackbar cannot be anchored to the top or dismissed by a
+/// directional swipe, and both are in the spec.
 abstract final class AppSnackbar {
   static final Queue<SnackMessage> _queue = Queue<SnackMessage>();
   static OverlayEntry? _entry;
   static OverlayState? _overlay;
 
   static void show(BuildContext context, SnackMessage message) {
-    _overlay = Overlay.of(context, rootOverlay: true);
     _queue.add(message);
+    if (_attach(context)) return;
+    // A save can land before the first frame — a share that cold-starts the app
+    // does exactly that. The message waits for an overlay rather than throwing.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (context.mounted) _attach(context);
+    });
+  }
+
+  /// Finds the overlay to host the strip, and starts it if one exists.
+  ///
+  /// `Overlay.maybeOf` only looks up the tree, so a context taken from the
+  /// router's navigator key — which sits *above* its own overlay — needs the
+  /// navigator asked directly.
+  static bool _attach(BuildContext context) {
+    final OverlayState? overlay =
+        Overlay.maybeOf(context, rootOverlay: true) ??
+        Navigator.maybeOf(context, rootNavigator: true)?.overlay;
+    if (overlay == null || !overlay.mounted) return false;
+    _overlay = overlay;
     if (_entry == null) _next();
+    return true;
   }
 
   static void info(BuildContext context, String text) =>
@@ -79,9 +99,7 @@ abstract final class AppSnackbar {
   }
 
   /// Drops anything still queued — used when the screen that raised them goes.
-  static void clear() {
-    _queue.clear();
-  }
+  static void clear() => _queue.clear();
 }
 
 class _SnackHost extends StatefulWidget {
@@ -123,7 +141,7 @@ class _SnackHostState extends State<_SnackHost>
     if (_dismissing) return;
     _dismissing = true;
     _timer?.cancel();
-    await _enter.reverse();
+    if (mounted) await _enter.reverse();
     if (mounted) widget.onDismissed();
   }
 
@@ -153,17 +171,17 @@ class _SnackHostState extends State<_SnackHost>
     final double slide = _top ? -24 : 24;
 
     return Positioned(
-      left: Space.md,
-      right: Space.md,
+      left: Space.screen,
+      right: Space.screen,
       top: _top ? mq.padding.top + Space.md : null,
-      // Clears the floating nav.
-      bottom: _top ? null : mq.padding.bottom + Space.bottomSafe,
+      // Sits above the floating nav, as the board places it.
+      bottom: _top ? null : mq.padding.bottom + 96,
       child: AnimatedBuilder(
         animation: _enter,
         builder: (BuildContext context, Widget? child) {
           final double t = _enter.value;
           return Opacity(
-            opacity: t,
+            opacity: t.clamp(0, 1),
             child: Transform.translate(
               offset:
                   _drag + (reduced ? Offset.zero : Offset(0, slide * (1 - t))),
@@ -174,15 +192,15 @@ class _SnackHostState extends State<_SnackHost>
         child: GestureDetector(
           onPanUpdate: _onPanUpdate,
           onPanEnd: _onPanEnd,
-          child: _SnackCard(message: widget.message, onClose: _dismiss),
+          child: _Strip(message: widget.message, onClose: _dismiss),
         ),
       ),
     );
   }
 }
 
-class _SnackCard extends StatelessWidget {
-  const _SnackCard({required this.message, required this.onClose});
+class _Strip extends StatelessWidget {
+  const _Strip({required this.message, required this.onClose});
 
   final SnackMessage message;
   final VoidCallback onClose;
@@ -190,11 +208,11 @@ class _SnackCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final PerchColors c = context.colors;
-    final Color dot = switch (message.variant) {
-      SnackVariant.info => c.accent,
-      SnackVariant.success => c.success,
-      SnackVariant.warning => c.warning,
-      SnackVariant.error => c.danger,
+    final (Color markColor, IconData markIcon) = switch (message.variant) {
+      SnackVariant.info => (c.inverseAccent, Icons.info_outline_rounded),
+      SnackVariant.success => (c.primary, Icons.check_rounded),
+      SnackVariant.warning => (c.warning, Icons.priority_high_rounded),
+      SnackVariant.error => (c.danger, Icons.close_rounded),
     };
 
     return Material(
@@ -202,15 +220,11 @@ class _SnackCard extends StatelessWidget {
       child: Semantics(
         liveRegion: true,
         child: Container(
-          padding: const EdgeInsets.fromLTRB(13, 11, Space.xs, 11),
+          constraints: const BoxConstraints(minHeight: 52),
+          padding: const EdgeInsets.symmetric(horizontal: Space.lg),
           decoration: BoxDecoration(
-            color: c.surfaceContainer,
-            borderRadius: Radii.thumbR,
-            border: Border.all(
-              color: message.variant == SnackVariant.error
-                  ? c.dangerContainer
-                  : c.outline,
-            ),
+            color: c.inverseSurface,
+            borderRadius: BorderRadius.circular(16),
             boxShadow: <BoxShadow>[
               BoxShadow(
                 color: c.shadow,
@@ -220,37 +234,50 @@ class _SnackCard extends StatelessWidget {
             ],
           ),
           child: Row(
-            spacing: Space.row,
+            spacing: 11,
             children: <Widget>[
               Container(
-                width: 9,
-                height: 9,
-                decoration: BoxDecoration(color: dot, shape: BoxShape.circle),
+                width: 24,
+                height: 24,
+                decoration: BoxDecoration(
+                  color: markColor,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(markIcon, size: 14, color: c.onPrimary),
               ),
               Expanded(
-                child: Text(
-                  message.text,
-                  style: PerchType.bodySmall.copyWith(color: c.onSurface),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: Space.md),
+                  child: Text(
+                    message.text,
+                    style: PerchType.label.copyWith(
+                      fontSize: 13.5,
+                      color: c.onInverseSurface,
+                    ),
+                  ),
                 ),
               ),
               if (message.actionLabel != null)
-                TextButton(
-                  onPressed: () {
+                GestureDetector(
+                  onTap: () {
                     message.onAction?.call();
                     onClose();
                   },
-                  child: Text(
-                    message.actionLabel!.toUpperCase(),
-                    style: PerchType.monoLabel.copyWith(color: c.accent),
+                  behavior: HitTestBehavior.opaque,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: Space.sm,
+                      vertical: Space.md,
+                    ),
+                    child: Text(
+                      message.actionLabel!,
+                      style: PerchType.labelStrong.copyWith(
+                        fontSize: 12.5,
+                        color: c.inverseAccent,
+                      ),
+                    ),
                   ),
                 ),
-              IconButton(
-                onPressed: onClose,
-                iconSize: 18,
-                visualDensity: VisualDensity.compact,
-                icon: Icon(Icons.close_rounded, color: c.onSurfaceVariant),
-                tooltip: 'Dismiss',
-              ),
             ],
           ),
         ),

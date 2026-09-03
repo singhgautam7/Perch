@@ -9,10 +9,8 @@ import '../../core/theme/app_theme.dart';
 import '../../core/theme/palette.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/theme/typography.dart';
-import '../../shared/widgets/app_button.dart';
-import '../../shared/widgets/folder_card.dart';
-import '../../shared/widgets/tag_chip.dart';
 import 'perch_hero.dart';
+import 'welcome_art.dart';
 
 /// Board 1c — three steps, every one skippable from the first.
 ///
@@ -57,7 +55,6 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final PerchColors c = context.colors;
     return Scaffold(
       body: SafeArea(
         child: Column(
@@ -73,33 +70,121 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
                 ],
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(26, 0, 26, Space.xl),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: <Widget>[
-                  AppButton(
-                    label: _step == 2 ? 'Start' : 'Next',
-                    fullWidth: true,
-                    onPressed: _next,
+            _Footer(
+              step: _step,
+              // The boards label the first and last steps Start, and the
+              // middle one Next.
+              primaryLabel: _step == 1 ? 'Next' : 'Start',
+              onPrimary: _next,
+              onSkip: _finish,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The page dots and the two buttons, side by side: a wide primary and a
+/// 96dp outlined Skip.
+class _Footer extends StatelessWidget {
+  const _Footer({
+    required this.step,
+    required this.primaryLabel,
+    required this.onPrimary,
+    required this.onSkip,
+  });
+
+  final int step;
+  final String primaryLabel;
+  final VoidCallback onPrimary;
+  final VoidCallback onSkip;
+
+  @override
+  Widget build(BuildContext context) {
+    final PerchColors c = context.colors;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(26, 0, 26, 34),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            spacing: 7,
+            children: <Widget>[
+              for (int i = 0; i < 3; i++)
+                AnimatedContainer(
+                  duration: Motion.of(context, Motion.navIndicator),
+                  curve: Motion.curveOf(context, Motion.decelerate),
+                  width: i == step ? 22 : 6,
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: i == step ? c.primary : c.outline,
+                    borderRadius: Radii.fullR,
                   ),
-                  const SizedBox(height: Space.md),
-                  Center(
-                    child: TextButton(
-                      onPressed: _finish,
-                      child: Text(
-                        'Skip',
-                        style: PerchType.label.copyWith(
-                          color: c.onSurfaceVariant,
+                ),
+            ],
+          ),
+          const SizedBox(height: 22),
+          Row(
+            spacing: Space.row,
+            children: <Widget>[
+              Expanded(
+                child: Semantics(
+                  button: true,
+                  label: primaryLabel,
+                  child: Material(
+                    color: c.primary,
+                    shape: const StadiumBorder(),
+                    clipBehavior: Clip.antiAlias,
+                    child: InkWell(
+                      onTap: onPrimary,
+                      child: SizedBox(
+                        height: 56,
+                        child: Center(
+                          child: Text(
+                            primaryLabel,
+                            style: PerchType.body
+                                .copyWith(
+                                  fontSize: 16,
+                                  letterSpacing: 0.16,
+                                  color: c.onPrimary,
+                                )
+                                .weight(600),
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ],
+                ),
               ),
-            ),
-          ],
-        ),
+              Semantics(
+                button: true,
+                label: 'Skip',
+                child: Material(
+                  color: Colors.transparent,
+                  shape: StadiumBorder(side: BorderSide(color: c.outline)),
+                  clipBehavior: Clip.antiAlias,
+                  child: InkWell(
+                    onTap: onSkip,
+                    child: SizedBox(
+                      width: 96,
+                      height: 56,
+                      child: Center(
+                        child: Text(
+                          'Skip',
+                          style: PerchType.body.copyWith(
+                            fontSize: 15,
+                            color: c.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -114,7 +199,8 @@ class _StepNumber extends StatelessWidget {
   Widget build(BuildContext context) => Text(
     '0$step / 03',
     style: PerchType.sectionHeader.copyWith(
-      color: context.colors.onSurfaceVariant,
+      letterSpacing: 0.99,
+      color: context.colors.accent,
     ),
   );
 }
@@ -125,33 +211,52 @@ class _HeroStep extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final PerchColors c = context.colors;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 26),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          const Expanded(child: Center(child: PerchHero())),
-          const _StepNumber(1),
-          const SizedBox(height: Space.md),
-          Text(
-            'Save any link.\nSort it your way.\nStays on your phone.',
-            style: PerchType.display.copyWith(
-              fontSize: 42,
-              height: 1.06,
-              color: c.onSurface,
+    return Stack(
+      children: <Widget>[
+        const Positioned(
+          top: -120,
+          left: -80,
+          right: -80,
+          height: 520,
+          child: HeroGlow(),
+        ),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            const SizedBox(height: 6),
+            const PerchHero(),
+            const Spacer(),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 26),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  const _StepNumber(1),
+                  const SizedBox(height: Space.md),
+                  Text(
+                    'Save any link.\nSort it your way.\nStays on your phone.',
+                    style: PerchType.display.copyWith(
+                      fontSize: 42,
+                      height: 1.06,
+                      letterSpacing: -0.84,
+                      color: c.onSurface,
+                    ),
+                  ),
+                  const SizedBox(height: Space.lg),
+                  Text(
+                    'No account · no ads · no tracking.',
+                    style: PerchType.monoTabular.copyWith(
+                      height: 1.5,
+                      color: c.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: Space.lg),
-          Text(
-            'No account · no ads · no tracking.',
-            style: PerchType.monoTabular.copyWith(
-              height: 1.5,
-              color: c.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: Space.xxl),
-        ],
-      ),
+            const SizedBox(height: Space.xxl),
+          ],
+        ),
+      ],
     );
   }
 }
@@ -162,80 +267,45 @@ class _OrganiseStep extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final PerchColors c = context.colors;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 26),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          const Expanded(child: Center(child: _NestedFolderArt())),
-          const _StepNumber(2),
-          const SizedBox(height: Space.md),
-          Text(
-            'Organize with folders & tags',
-            style: PerchType.display.copyWith(
-              fontSize: 32,
-              height: 1.1,
-              color: c.onSurface,
-            ),
-          ),
-          const SizedBox(height: Space.md),
-          Text(
-            'Nest folders as deep as you like, tag across them, and everything '
-            'stays one tap away in the Folders tab.',
-            style: PerchType.body.copyWith(color: c.onSurfaceVariant),
-          ),
-          const SizedBox(height: Space.xxl),
-        ],
-      ),
-    );
-  }
-}
-
-/// Nested folders on the left, one link with its tags on the right.
-class _NestedFolderArt extends StatelessWidget {
-  const _NestedFolderArt();
-
-  @override
-  Widget build(BuildContext context) {
-    final PerchColors c = context.colors;
-    Widget row(String name, double indent, Color color) => Padding(
-      padding: EdgeInsets.only(left: indent, bottom: Space.sm),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        spacing: Space.row,
-        children: <Widget>[
-          FolderGlyph(color: color, width: 20),
-          Text(
-            name,
-            style: PerchType.titleSmall.copyWith(color: c.onSurface),
-          ),
-        ],
-      ),
-    );
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        Expanded(
+        const Expanded(
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: Space.screen),
+            child: Center(child: OrganiseArt()),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 26),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              row('Reading', 0, c.primary),
-              row('AI papers', Space.screen, c.accent),
-              row('Essays', Space.screen, c.accent),
-              row('Recipes', 0, c.primary),
+              const _StepNumber(2),
+              const SizedBox(height: Space.md),
+              Text(
+                'Organize with folders & tags',
+                style: PerchType.display.copyWith(
+                  fontSize: 36,
+                  height: 1.12,
+                  letterSpacing: -0.72,
+                  color: c.onSurface,
+                ),
+              ),
+              const SizedBox(height: Space.row),
+              Text(
+                'Nest folders as deep as you like, tag across them, and '
+                'everything stays one tap away in the Folders tab.',
+                style: PerchType.body.copyWith(
+                  fontSize: 14.5,
+                  height: 1.55,
+                  color: c.onSurfaceVariant,
+                ),
+              ),
             ],
           ),
         ),
-        const Wrap(
-          spacing: 6,
-          runSpacing: 6,
-          children: <Widget>[
-            TagChip(label: 'reading', style: ChipStyle.active),
-            TagChip(label: 'essays'),
-          ],
-        ),
+        const SizedBox(height: Space.xxl),
       ],
     );
   }
@@ -248,131 +318,71 @@ class _ThemeStep extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final PerchColors c = context.colors;
-    final String selected = ref.watch(
-      settingsProvider.select((AppSettings s) => s.familyId),
-    );
+    final AppSettings s = ref.watch(settingsProvider);
+    final Tone tone =
+        s.toneFor(MediaQuery.platformBrightnessOf(context)) == Tone.light
+        ? Tone.light
+        : Tone.dark;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 26),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          const SizedBox(height: Space.xxl),
-          const _StepNumber(3),
-          const SizedBox(height: Space.md),
-          Text(
-            'Pick a look',
-            style: PerchType.display.copyWith(
-              fontSize: 32,
-              height: 1.1,
-              color: c.onSurface,
-            ),
+    return ListView(
+      padding: const EdgeInsets.only(bottom: Space.xl),
+      children: <Widget>[
+        Padding(
+          padding: const EdgeInsets.fromLTRB(26, 40, 26, 0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              const _StepNumber(3),
+              const SizedBox(height: Space.md),
+              Text(
+                'Pick a look',
+                style: PerchType.display.copyWith(
+                  fontSize: 36,
+                  height: 1.12,
+                  letterSpacing: -0.72,
+                  color: c.onSurface,
+                ),
+              ),
+              const SizedBox(height: Space.row),
+              Text(
+                'All themes are free, and you can change this any time in '
+                'More → Appearance.',
+                style: PerchType.body.copyWith(
+                  fontSize: 14.5,
+                  height: 1.55,
+                  color: c.onSurfaceVariant,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: Space.md),
-          Text(
-            'All themes are free, and you can change this any time in '
-            'More → Appearance.',
-            style: PerchType.body.copyWith(color: c.onSurfaceVariant),
-          ),
-          const SizedBox(height: Space.xl),
-          Wrap(
-            spacing: Space.md,
-            runSpacing: Space.md,
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(26, 26, 26, 0),
+          child: GridView.count(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisCount: 2,
+            mainAxisSpacing: Space.md,
+            crossAxisSpacing: Space.md,
+            childAspectRatio: 1.85,
             children: <Widget>[
               for (final ThemeFamily family in ThemeFamily.all)
-                _ThemeSwatch(
+                ThemeSwatchCard(
                   family: family,
-                  selected: family.id == selected,
-                  onTap: () =>
-                      ref.read(settingsProvider.notifier).setFamily(family.id),
+                  tone: tone,
+                  selected: !s.dynamicColor && family.id == s.familyId,
+                  onTap: () => ref
+                      .read(settingsProvider.notifier)
+                      .setFamily(family.id),
                 ),
             ],
           ),
-          const Spacer(),
-          _ShareHint(),
-          const SizedBox(height: Space.xl),
-        ],
-      ),
-    );
-  }
-}
-
-class _ThemeSwatch extends StatelessWidget {
-  const _ThemeSwatch({
-    required this.family,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final ThemeFamily family;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final PerchColors c = context.colors;
-    final PerchColors swatch = family.colors(Tone.light);
-    return Semantics(
-      button: true,
-      selected: selected,
-      label: '${family.name} theme',
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: Radii.fullR,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: swatch.primary,
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: selected ? c.primaryContainer : Colors.transparent,
-                  width: 3,
-                ),
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              family.name,
-              style: PerchType.label.copyWith(
-                color: selected ? c.accent : c.onSurfaceVariant,
-              ),
-            ),
-          ],
         ),
-      ),
-    );
-  }
-}
-
-/// A card, not a tooltip — it survives being read slowly and needs no dismissal.
-class _ShareHint extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    final PerchColors c = context.colors;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-      decoration: BoxDecoration(
-        color: c.surfaceContainer,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: c.outline),
-      ),
-      child: Text.rich(
-        TextSpan(
-          text: 'Next: open any app, hit ',
-          style: PerchType.bodySmall.copyWith(color: c.onSurfaceVariant),
-          children: <InlineSpan>[
-            TextSpan(
-              text: 'Share → Perch',
-              style: PerchType.labelStrong.copyWith(color: c.accent),
-            ),
-            const TextSpan(text: ' to save your first link.'),
-          ],
+        const Padding(
+          padding: EdgeInsets.fromLTRB(26, 20, 26, 0),
+          child: ShareHintCard(),
         ),
-      ),
+      ],
     );
   }
 }

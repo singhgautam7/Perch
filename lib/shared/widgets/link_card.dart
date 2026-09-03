@@ -126,7 +126,7 @@ class _Large extends StatelessWidget {
                     if (link.note.trim().isNotEmpty) ...<Widget>[
                       const SizedBox(height: 6),
                       Text(
-                        link.note.trim().replaceAll('\n', ' '),
+                        notePreview(link.note),
                         style: PerchType.bodySmall.copyWith(
                           color: c.onSurfaceVariant,
                           height: 1.4,

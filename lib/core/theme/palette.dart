@@ -30,6 +30,9 @@ class PerchColors extends ThemeExtension<PerchColors> {
     required this.warning,
     required this.danger,
     required this.dangerContainer,
+    required this.inverseSurface,
+    required this.onInverseSurface,
+    required this.inverseAccent,
     required this.shadow,
   });
 
@@ -82,6 +85,14 @@ class PerchColors extends ThemeExtension<PerchColors> {
   final Color danger;
   final Color dangerContainer;
 
+  /// The undo strip and anything else that has to sit above the page rather
+  /// than in it — dark in a light theme, light in a dark one.
+  final Color inverseSurface;
+  final Color onInverseSurface;
+
+  /// The accent as it reads on [inverseSurface].
+  final Color inverseAccent;
+
   /// Only the nav pill and the FAB cast one.
   final Color shadow;
 
@@ -107,6 +118,9 @@ class PerchColors extends ThemeExtension<PerchColors> {
     Color? warning,
     Color? danger,
     Color? dangerContainer,
+    Color? inverseSurface,
+    Color? onInverseSurface,
+    Color? inverseAccent,
     Color? shadow,
   }) {
     return PerchColors(
@@ -130,6 +144,9 @@ class PerchColors extends ThemeExtension<PerchColors> {
       warning: warning ?? this.warning,
       danger: danger ?? this.danger,
       dangerContainer: dangerContainer ?? this.dangerContainer,
+      inverseSurface: inverseSurface ?? this.inverseSurface,
+      onInverseSurface: onInverseSurface ?? this.onInverseSurface,
+      inverseAccent: inverseAccent ?? this.inverseAccent,
       shadow: shadow ?? this.shadow,
     );
   }
@@ -162,6 +179,9 @@ class PerchColors extends ThemeExtension<PerchColors> {
       warning: l(warning, other.warning),
       danger: l(danger, other.danger),
       dangerContainer: l(dangerContainer, other.dangerContainer),
+      inverseSurface: l(inverseSurface, other.inverseSurface),
+      onInverseSurface: l(onInverseSurface, other.onInverseSurface),
+      inverseAccent: l(inverseAccent, other.inverseAccent),
       shadow: l(shadow, other.shadow),
     );
   }
@@ -309,6 +329,9 @@ class ThemeFamily {
       warning: const Oklch(0.66, 0.13, 62).toColor(),
       danger: const Oklch(0.55, 0.16, 25).toColor(),
       dangerContainer: const Oklch(0.86, 0.05, 25).toColor(),
+      inverseSurface: _n(0.22, 0.02).toColor(),
+      onInverseSurface: _n(0.97, 0.004).toColor(),
+      inverseAccent: _p(0.82, pc * 0.63).toColor(),
       shadow: const Oklch(0.35, 0.06, 265, 0.09).toColor(),
     );
   }
@@ -342,6 +365,9 @@ class ThemeFamily {
       warning: const Oklch(0.78, 0.12, 62).toColor(),
       danger: const Oklch(0.72, 0.14, 25).toColor(),
       dangerContainer: const Oklch(0.40, 0.08, 25).toColor(),
+      inverseSurface: _n(0.93, 0.008).toColor(),
+      onInverseSurface: _n(0.20, 0.02).toColor(),
+      inverseAccent: _p(0.42, pcd).toColor(),
       shadow: const Oklch(0, 0, 0, 0.5).toColor(),
     );
   }

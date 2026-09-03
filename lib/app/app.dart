@@ -30,9 +30,13 @@ class _PerchAppState extends ConsumerState<PerchApp> {
   void initState() {
     super.initState();
     // A share saves straight into Unsorted and confirms; it never opens a form.
-    final ShareHandler handler = ref.read(shareHandlerProvider);
-    _savedFromShare = handler.saved.stream.listen(_confirmShareSave);
-    unawaited(handler.start());
+    // Started after the first frame: a share that cold-starts the app can
+    // otherwise finish saving before there is anything on screen to confirm on.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final ShareHandler handler = ref.read(shareHandlerProvider);
+      _savedFromShare = handler.saved.stream.listen(_confirmShareSave);
+      unawaited(handler.start());
+    });
   }
 
   @override

@@ -107,7 +107,12 @@ class _ModeSwitch extends StatelessWidget {
       ),
       child: Row(
         children: <Widget>[
-          for (final ThemeMode m in ThemeMode.values)
+          // Board order: Light · Dark · System, not the enum's own.
+          for (final ThemeMode m in const <ThemeMode>[
+            ThemeMode.light,
+            ThemeMode.dark,
+            ThemeMode.system,
+          ])
             Expanded(
               child: Semantics(
                 button: true,

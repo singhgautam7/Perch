@@ -87,6 +87,18 @@ class SettingsController extends Notifier<AppSettings> {
     state.copyWith(viewMode: mode),
   );
 
+  Future<void> setFolderView(FolderViewMode mode) => _put(
+    SettingsRepository.kFolderView,
+    mode.name,
+    state.copyWith(folderView: mode),
+  );
+
+  Future<void> setFolderSort(FolderSort sort) => _put(
+    SettingsRepository.kFolderSort,
+    sort.name,
+    state.copyWith(folderSort: sort),
+  );
+
   Future<void> setLandingTab(LandingTab tab) => _put(
     SettingsRepository.kLanding,
     tab.name,

@@ -12,9 +12,11 @@ import '../../core/theme/palette.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/theme/typography.dart';
 import '../../core/utils/format.dart';
+import '../../shared/widgets/app_bottom_sheet.dart';
 import '../../shared/widgets/app_icon_button.dart';
 import '../../shared/widgets/breadcrumb.dart';
 import '../../shared/widgets/folder_card.dart';
+import '../../shared/widgets/section_header.dart';
 import '../../shared/widgets/states.dart';
 import '../../shared/widgets/view_mode_button.dart';
 import '../links/link_feed.dart';
@@ -23,43 +25,43 @@ import 'folder_actions.dart';
 import 'folder_providers.dart';
 import 'new_folder_row.dart';
 
-/// Board 2c — the structural surface.
+/// Board 2c — the structural surface, in the same language as Links: a title,
+/// a count, a sort control, and the same search and view controls.
 ///
-/// Root shows the create row and the folder list; links at root are rare and
-/// live on the Links tab. Inside a folder: breadcrumb, subfolders, then that
-/// folder's links, with the view-mode switcher applying to the links only.
+/// The root browses like a file explorer: folders first, then the links that
+/// sit loose at the root, rather than hiding them behind an Unsorted row.
 class FoldersScreen extends ConsumerWidget {
   const FoldersScreen({this.folderId, super.key});
 
   final int? folderId;
-
-  bool get _isRoot => folderId == null;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final AsyncValue<List<FolderSummary>> children = ref.watch(
       folderChildrenProvider(folderId),
     );
-    final LinkViewMode mode = ref.watch(
-      settingsProvider.select((AppSettings s) => s.viewMode),
-    );
+    final AppSettings settings = ref.watch(settingsProvider);
 
     return SafeArea(
       bottom: false,
       child: Column(
         children: <Widget>[
-          _TopBar(folderId: folderId, mode: mode),
-          if (!_isRoot) _CrumbBar(folderId: folderId),
+          _TopBar(folderId: folderId, settings: settings),
+          if (folderId != null) _CrumbBar(folderId: folderId),
           Expanded(
-            child: children.when(
-              loading: () => const SizedBox.shrink(),
-              error: (Object e, StackTrace _) => ErrorStateView(message: '$e'),
-              data: (List<FolderSummary> folders) => _Body(
-                folderId: folderId,
-                folders: folders,
-                mode: mode,
-              ),
-            ),
+            child: switch (children) {
+              AsyncValue<List<FolderSummary>>(
+                :final List<FolderSummary> value?,
+              ) =>
+                _Body(
+                  folderId: folderId,
+                  folders: value,
+                  settings: settings,
+                ),
+              AsyncValue<List<FolderSummary>>(:final Object error?) =>
+                ErrorStateView(message: '$error'),
+              _ => const SizedBox.shrink(),
+            },
           ),
         ],
       ),
@@ -68,10 +70,10 @@ class FoldersScreen extends ConsumerWidget {
 }
 
 class _TopBar extends ConsumerWidget {
-  const _TopBar({required this.folderId, required this.mode});
+  const _TopBar({required this.folderId, required this.settings});
 
   final int? folderId;
-  final LinkViewMode mode;
+  final AppSettings settings;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -112,19 +114,69 @@ class _TopBar extends ConsumerWidget {
               overflow: TextOverflow.ellipsis,
             ),
           ),
-          if (folderId != null)
-            ViewModeButton(
-              mode: mode,
-              onChanged: (LinkViewMode m) =>
-                  ref.read(settingsProvider.notifier).setViewMode(m),
-            ),
           AppIconButton(
             icon: Icons.search_rounded,
             onPressed: () => context.push(Routes.search),
             semanticLabel: 'Search links',
             size: 40,
           ),
+          // At the root the switcher lays out folders; inside a folder it
+          // applies to that folder's links, as the board specifies.
+          if (folderId == null)
+            _FolderViewButton(mode: settings.folderView)
+          else
+            ViewModeButton(
+              mode: settings.viewMode,
+              onChanged: (LinkViewMode m) =>
+                  ref.read(settingsProvider.notifier).setViewMode(m),
+            ),
         ],
+      ),
+    );
+  }
+}
+
+class _FolderViewButton extends ConsumerWidget {
+  const _FolderViewButton({required this.mode});
+
+  final FolderViewMode mode;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final PerchColors c = context.colors;
+    final FolderViewMode next = mode == FolderViewMode.list
+        ? FolderViewMode.grid
+        : FolderViewMode.list;
+
+    return Semantics(
+      button: true,
+      label: '${mode.label} layout. Switch to ${next.label}',
+      child: SizedBox(
+        width: IconSpec.tapTarget,
+        height: IconSpec.tapTarget,
+        child: Center(
+          child: Material(
+            color: c.surfaceContainerHigh,
+            shape: const CircleBorder(),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: () =>
+                  ref.read(settingsProvider.notifier).setFolderView(next),
+              child: SizedBox(
+                width: 40,
+                height: 40,
+                child: Center(
+                  child: ViewModeGlyph(
+                    mode: mode == FolderViewMode.list
+                        ? LinkViewMode.minimal
+                        : LinkViewMode.grid,
+                    color: c.icon,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -141,7 +193,12 @@ class _CrumbBar extends ConsumerWidget {
         ref.watch(breadcrumbProvider(folderId)).valueOrNull ?? const <Crumb>[];
     if (crumbs.isEmpty) return const SizedBox.shrink();
     return Padding(
-      padding: const EdgeInsets.fromLTRB(Space.screen, 0, Space.screen, Space.md),
+      padding: const EdgeInsets.fromLTRB(
+        Space.screen,
+        0,
+        Space.screen,
+        Space.sm,
+      ),
       child: Align(
         alignment: Alignment.centerLeft,
         child: Breadcrumb(
@@ -159,12 +216,12 @@ class _Body extends ConsumerWidget {
   const _Body({
     required this.folderId,
     required this.folders,
-    required this.mode,
+    required this.settings,
   });
 
   final int? folderId;
   final List<FolderSummary> folders;
-  final LinkViewMode mode;
+  final AppSettings settings;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -177,157 +234,185 @@ class _Body extends ConsumerWidget {
                   .firstOrNull
                   ?.name ??
               'Root';
+    final int totalFolders =
+        ref.watch(folderCountProvider).valueOrNull ?? folders.length;
 
-    final Widget header = Padding(
-      padding: const EdgeInsets.fromLTRB(Space.screen, 0, Space.screen, 14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: <Widget>[
-          NewFolderRow(
-            locationName: locationName,
-            onCreate: (String name) => ref
-                .read(folderRepositoryProvider)
-                .create(name: name, parentId: folderId),
+    final Widget header = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        SectionHeader(
+          label: folderId == null
+              ? 'All folders · ${grouped(totalFolders)}'
+              : 'Folders · ${grouped(folders.length)}',
+          trailing: _FolderSortControl(sort: settings.folderSort),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            Space.screen,
+            0,
+            Space.screen,
+            14,
           ),
-          if (folders.isNotEmpty) const SizedBox(height: 14),
-          for (int i = 0; i < folders.length; i++) ...<Widget>[
-            if (i > 0) const SizedBox(height: Space.sm),
-            FolderRow(
-              summary: folders[i],
-              onTap: () => context.push(Routes.folder(folders[i].folder.id)),
-              onLongPress: () =>
-                  showFolderActions(context, ref, folders[i].folder),
-            ),
-          ],
-          if (folderId == null) ...<Widget>[
-            const SizedBox(height: Space.sm),
-            const _UnsortedRow(),
-          ],
-        ],
-      ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              NewFolderRow(
+                locationName: locationName,
+                onCreate: (String name) => ref
+                    .read(folderRepositoryProvider)
+                    .create(name: name, parentId: folderId),
+              ),
+              if (folders.isNotEmpty) ...<Widget>[
+                const SizedBox(height: 14),
+                _FolderLayout(folders: folders, settings: settings),
+              ],
+              if (folders.isNotEmpty) const SizedBox(height: Space.lg),
+            ],
+          ),
+        ),
+      ],
     );
 
-    // Root has no link list — its links belong to the Links tab.
-    if (folderId == null) {
-      return SingleChildScrollView(
-        padding: const EdgeInsets.only(bottom: Space.bottomSafe),
-        child: Column(
-          children: <Widget>[
-            header,
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: Space.screen),
-              child: _RootHint(),
-            ),
-          ],
-        ),
-      );
-    }
-
+    // The links at this location, drawn exactly as they are on the Links tab.
+    // The root is no exception: loose links show here, like a file explorer.
     final AsyncValue<LinkFeed> feed = ref.watch(
       linkFeedProvider(folderScope(folderId)),
     );
-    return feed.when(
-      loading: () => const ListSkeleton(rows: 3),
-      error: (Object e, StackTrace _) => ErrorStateView(message: '$e'),
-      data: (LinkFeed data) {
-        if (data.items.isEmpty && folders.isEmpty) {
+
+    // Same as Links: the previous page stays put while the feed reloads.
+    final LinkFeed? loaded = feed.valueOrNull;
+    if (feed.hasError && loaded == null) {
+      return ErrorStateView(message: '${feed.error}');
+    }
+    if (loaded == null) return SingleChildScrollView(child: header);
+
+    return (LinkFeed data) {
+        if (data.items.isEmpty) {
           return SingleChildScrollView(
             padding: const EdgeInsets.only(bottom: Space.bottomSafe),
             child: Column(
               children: <Widget>[
                 header,
-                const EmptyState(
-                  title: 'Nothing in here yet',
-                  message: 'Links you save into this folder will show up here.',
-                  showMark: false,
-                ),
+                if (folders.isEmpty)
+                  EmptyState(
+                    title: folderId == null
+                        ? 'No folders yet'
+                        : 'Nothing in here yet',
+                    message: folderId == null
+                        ? 'Make a folder above, and file links into it as you '
+                              'save them.'
+                        : 'Links you save into this folder will show up here.',
+                    showMark: false,
+                  ),
               ],
             ),
           );
         }
         return LinkList(
           feed: data,
-          mode: mode,
+          mode: settings.viewMode,
+          showLocation: false,
           paths: ref.watch(folderPathsProvider),
-          header: header,
+          header: Column(
+            children: <Widget>[
+              header,
+              SectionHeader(label: 'Links · ${grouped(data.items.length)}'),
+            ],
+          ),
           onLoadMore: () => ref
               .read(linkFeedProvider(folderScope(folderId)).notifier)
               .loadMore(),
         );
-      },
+      }(loaded);
+  }
+}
+
+class _FolderLayout extends ConsumerWidget {
+  const _FolderLayout({required this.folders, required this.settings});
+
+  final List<FolderSummary> folders;
+  final AppSettings settings;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    void open(FolderSummary f) => context.push(Routes.folder(f.folder.id));
+    void actions(FolderSummary f) =>
+        showFolderActions(context, ref, f.folder);
+
+    if (settings.folderView == FolderViewMode.grid) {
+      return GridView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        padding: EdgeInsets.zero,
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          mainAxisSpacing: Space.sm,
+          crossAxisSpacing: Space.sm,
+          childAspectRatio: 1.55,
+        ),
+        itemCount: folders.length,
+        itemBuilder: (BuildContext context, int i) => FolderCard(
+          summary: folders[i],
+          onTap: () => open(folders[i]),
+          onLongPress: () => actions(folders[i]),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        for (int i = 0; i < folders.length; i++) ...<Widget>[
+          if (i > 0) const SizedBox(height: Space.sm),
+          FolderRow(
+            summary: folders[i],
+            onTap: () => open(folders[i]),
+            onLongPress: () => actions(folders[i]),
+          ),
+        ],
+      ],
     );
   }
 }
 
-/// Root's link bucket. Tapping it goes to the Links tab, filtered to unsorted.
-class _UnsortedRow extends ConsumerWidget {
-  const _UnsortedRow();
+class _FolderSortControl extends ConsumerWidget {
+  const _FolderSortControl({required this.sort});
+
+  final FolderSort sort;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final PerchColors c = context.colors;
-    final int count =
-        ref.watch(linkFeedProvider(folderScope(null))).valueOrNull?.items.length ??
-        0;
-    if (count == 0) return const SizedBox.shrink();
-
-    return Material(
-      color: c.surfaceContainer,
-      borderRadius: BorderRadius.circular(18),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () => context.go(Routes.links),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 14),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: c.outline),
-          ),
-          child: Row(
-            spacing: 13,
-            children: <Widget>[
-              FolderGlyph(color: c.onSurfaceMuted, width: 26),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(
-                      'Unsorted',
-                      style: PerchType.titleMedium.copyWith(color: c.onSurface),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      plural(count, 'link'),
-                      style: PerchType.monoLabel.copyWith(
-                        color: c.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Icon(
-                Icons.chevron_right_rounded,
-                size: 20,
-                color: c.onSurfaceVariant,
-              ),
-            ],
+    return InkWell(
+      onTap: () async {
+        final FolderSort? picked = await showOptionSheet<FolderSort>(
+          context: context,
+          title: 'Sort folders',
+          icon: Icons.swap_vert_rounded,
+          selected: sort,
+          options: <SheetOption<FolderSort>>[
+            for (final FolderSort option in FolderSort.values)
+              SheetOption<FolderSort>(value: option, label: option.label),
+          ],
+        );
+        if (picked != null) {
+          await ref.read(settingsProvider.notifier).setFolderSort(picked);
+        }
+      },
+      borderRadius: Radii.chipR,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: Space.sm,
+          vertical: Space.sm,
+        ),
+        child: Text(
+          '${sort.short} ↓',
+          style: PerchType.monoLabel.copyWith(
+            fontSize: 11.5,
+            color: c.onSurfaceVariant,
           ),
         ),
       ),
     );
   }
-}
-
-class _RootHint extends StatelessWidget {
-  const _RootHint();
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(top: Space.lg),
-    child: Text(
-      'Long-press a folder to rename, move or delete it.',
-      textAlign: TextAlign.center,
-      style: PerchType.bodySmall.copyWith(color: context.colors.onSurfaceMuted),
-    ),
-  );
 }

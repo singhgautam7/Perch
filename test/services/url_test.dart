@@ -75,6 +75,23 @@ void main() {
     });
   });
 
+  group('notePreview', () {
+    test('flattens markdown to one line of prose', () {
+      expect(
+        notePreview('## Why I saved this\n\n- [x] read it\n- **quote** §2'),
+        'Why I saved this read it quote §2',
+      );
+    });
+
+    test('unwraps links to their text', () {
+      expect(notePreview('see [the paper](https://a.test/x)'), 'see the paper');
+    });
+
+    test('leaves plain prose alone', () {
+      expect(notePreview('Just a note.'), 'Just a note.');
+    });
+  });
+
   group('formatting', () {
     test('short ages read as the boards show them', () {
       final DateTime now = DateTime(2026, 9, 3, 12);

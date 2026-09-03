@@ -223,6 +223,7 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
                 onTap: () async {
                   final DateTimeRange? range = await showDateRangePicker(
                     context: context,
+                    useRootNavigator: true,
                     firstDate: DateTime(2000),
                     lastDate: DateTime.now(),
                   );

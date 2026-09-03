@@ -156,11 +156,24 @@ void main() {
       scaledArt(canvas, const ui.Color(0xFF000000), bars: false);
     });
 
+    // The Android 12+ splash masks its icon to a circle of 2/3 the canvas, so
+    // the art is drawn smaller here than on the launcher icon.
+    await write('splash', (ui.Canvas canvas) {
+      canvas
+        ..save()
+        ..translate(out / 2, out / 2)
+        ..scale(0.62)
+        ..translate(-out / 2, -out / 2);
+      drawCard(canvas, fill: cardFill);
+      canvas.restore();
+    });
+
     for (final String name in <String>[
       'icon',
       'background',
       'foreground',
       'monochrome',
+      'splash',
     ]) {
       expect(File('assets/icon/$name.png').existsSync(), isTrue);
     }

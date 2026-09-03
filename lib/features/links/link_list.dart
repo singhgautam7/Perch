@@ -19,6 +19,7 @@ class LinkList extends StatelessWidget {
     required this.paths,
     required this.onLoadMore,
     this.header,
+    this.showLocation = true,
     super.key,
   });
 
@@ -31,6 +32,9 @@ class LinkList extends StatelessWidget {
 
   /// Rendered above the links and scrolled with them.
   final Widget? header;
+
+  /// False inside Folders, where the location is wherever you are standing.
+  final bool showLocation;
 
   static const EdgeInsets _padding = EdgeInsets.fromLTRB(
     Space.screen,
@@ -52,7 +56,7 @@ class LinkList extends StatelessWidget {
     return LinkCard(
       data: item,
       mode: mode,
-      locationLabel: mode == LinkViewMode.grid ? null : path,
+      locationLabel: !showLocation || mode == LinkViewMode.grid ? null : path,
       onLocationTap: item.link.folderId == null
           ? null
           : () => context.go(Routes.folder(item.link.folderId!)),

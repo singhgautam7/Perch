@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 
 import 'database.dart';
+import 'settings_repository.dart';
 
 /// A folder plus the two counts its card shows.
 class FolderSummary {
@@ -23,7 +24,10 @@ class FolderRepository {
   final PerchDatabase _db;
 
   /// Children of [parentId], or the root folders when null.
-  Stream<List<FolderSummary>> watchChildren(int? parentId) {
+  Stream<List<FolderSummary>> watchChildren(
+    int? parentId, {
+    FolderSort sort = FolderSort.name,
+  }) {
     final $FoldersTable f = _db.folders;
     final $FoldersTable sub = _db.alias(_db.folders, 'sub');
     final $LinksTable l = _db.alias(_db.links, 'l');
@@ -37,14 +41,23 @@ class FolderRepository {
       parentId == null ? f.parentId.isNull() : f.parentId.equals(parentId),
     );
     q.groupBy(<Expression<Object>>[f.id]);
-    q.orderBy(<OrderingTerm>[
-      OrderingTerm(expression: f.sortIndex),
-      OrderingTerm(expression: f.name),
-    ]);
-
     final Expression<int> subCount = sub.id.count(distinct: true);
     final Expression<int> linkCount = l.id.count(distinct: true);
     q.addColumns(<Expression<Object>>[subCount, linkCount]);
+    q.orderBy(<OrderingTerm>[
+      switch (sort) {
+        FolderSort.name => OrderingTerm(expression: f.name.lower()),
+        FolderSort.newest => OrderingTerm(
+          expression: f.createdAt,
+          mode: OrderingMode.desc,
+        ),
+        FolderSort.mostLinks => OrderingTerm(
+          expression: linkCount,
+          mode: OrderingMode.desc,
+        ),
+      },
+      OrderingTerm(expression: f.name.lower()),
+    ]);
 
     return q.watch().map(
       (List<TypedResult> rows) => rows

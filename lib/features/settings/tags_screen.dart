@@ -298,6 +298,7 @@ class _TagRow extends ConsumerWidget {
     );
     final String? result = await showDialog<String>(
       context: context,
+      useRootNavigator: true,
       builder: (BuildContext dialogContext) => AlertDialog(
         backgroundColor: dialogContext.colors.surfaceContainer,
         title: Text(title, style: PerchType.titleMedium),

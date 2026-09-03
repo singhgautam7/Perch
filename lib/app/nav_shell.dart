@@ -13,6 +13,7 @@ class NavShell extends StatefulWidget {
     required this.index,
     required this.onSelect,
     required this.onAdd,
+    required this.tabCount,
     super.key,
   });
 
@@ -20,6 +21,7 @@ class NavShell extends StatefulWidget {
   final int index;
   final ValueChanged<int> onSelect;
   final VoidCallback onAdd;
+  final int tabCount;
 
   @override
   State<NavShell> createState() => _NavShellState();
@@ -37,6 +39,16 @@ class _NavShellState extends State<NavShell>
   void dispose() {
     _hide.dispose();
     super.dispose();
+  }
+
+  /// A horizontal fling anywhere on the page moves to the next destination.
+  /// Vertical drags belong to the list, so only a decisive horizontal one wins.
+  void _onHorizontalFling(DragEndDetails details) {
+    final double velocity = details.primaryVelocity ?? 0;
+    if (velocity.abs() < 240) return;
+    final int next = velocity < 0 ? widget.index + 1 : widget.index - 1;
+    if (next < 0 || next >= widget.tabCount) return;
+    widget.onSelect(next);
   }
 
   bool _onScroll(ScrollNotification n) {
@@ -64,7 +76,13 @@ class _NavShellState extends State<NavShell>
         onNotification: _onScroll,
         child: Stack(
           children: <Widget>[
-            widget.child,
+            GestureDetector(
+              onHorizontalDragEnd: _onHorizontalFling,
+              // Transparent, not opaque: the pages underneath still get their
+              // own taps and vertical drags.
+              behavior: HitTestBehavior.translucent,
+              child: widget.child,
+            ),
             Positioned(
               left: 0,
               right: 0,

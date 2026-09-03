@@ -33,3 +33,24 @@ String grouped(int value) {
 /// "1 link" / "12 links".
 String plural(int count, String singular, [String? pluralForm]) =>
     '$count ${count == 1 ? singular : (pluralForm ?? '${singular}s')}';
+
+/// A markdown note flattened to one line of prose for a card preview — the
+/// marks are for the editor, not for a 12px summary.
+String notePreview(String markdown) {
+  return markdown
+      .replaceAll(RegExp(r'^\s*#{1,6}\s*', multiLine: true), '')
+      .replaceAll(RegExp(r'^\s*[-*+]\s+\[[ xX]\]\s*', multiLine: true), '')
+      .replaceAll(RegExp(r'^\s*[-*+]\s+', multiLine: true), '')
+      .replaceAll(RegExp(r'^\s*\d+\.\s+', multiLine: true), '')
+      .replaceAll(RegExp(r'^\s*>\s?', multiLine: true), '')
+      .replaceAll(RegExp(r'`{1,3}'), '')
+      .replaceAll(RegExp(r'\*{1,3}|_{1,3}|~~'), '')
+      // A link keeps its text and loses its target — replaceAll does not
+      // expand capture groups, so this one has to be mapped.
+      .replaceAllMapped(
+        RegExp(r'!?\[([^\]]*)\]\([^)]*\)'),
+        (Match m) => m.group(1) ?? '',
+      )
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .trim();
+}
