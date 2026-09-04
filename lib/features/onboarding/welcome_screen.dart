@@ -358,24 +358,31 @@ class _ThemeStep extends ConsumerWidget {
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(26, 26, 26, 0),
-          child: GridView.count(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            crossAxisCount: 2,
-            mainAxisSpacing: Space.md,
-            crossAxisSpacing: Space.md,
-            childAspectRatio: 1.85,
-            children: <Widget>[
-              for (final ThemeFamily family in ThemeFamily.all)
-                ThemeSwatchCard(
-                  family: family,
-                  tone: tone,
-                  selected: !s.dynamicColor && family.id == s.familyId,
-                  onTap: () => ref
-                      .read(settingsProvider.notifier)
-                      .setFamily(family.id),
-                ),
-            ],
+          // A Wrap rather than a grid: a fixed aspect ratio pins the card
+          // height, and at a large OS text scale the name line then has
+          // nowhere to go. Here the card is as tall as its content needs.
+          child: LayoutBuilder(
+            builder: (BuildContext context, BoxConstraints constraints) {
+              final double half = (constraints.maxWidth - Space.md) / 2;
+              return Wrap(
+                spacing: Space.md,
+                runSpacing: Space.md,
+                children: <Widget>[
+                  for (final ThemeFamily family in ThemeFamily.all)
+                    SizedBox(
+                      width: half,
+                      child: ThemeSwatchCard(
+                        family: family,
+                        tone: tone,
+                        selected: !s.dynamicColor && family.id == s.familyId,
+                        onTap: () => ref
+                            .read(settingsProvider.notifier)
+                            .setFamily(family.id),
+                      ),
+                    ),
+                ],
+              );
+            },
           ),
         ),
         const Padding(

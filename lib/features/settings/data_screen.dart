@@ -164,13 +164,13 @@ class _DataScreenState extends ConsumerState<DataScreen> {
     return SettingsScaffold(
       title: 'Data',
       children: <Widget>[
-        DataRow2(
+        SettingsListRow(
           label: 'Export backup',
           value: stats == null
               ? 'Everything, as one JSON file'
               : '${plural(stats.links, 'link')}, ${plural(stats.tags, 'tag')}, '
                     '${plural(stats.folders, 'folder')} → JSON',
-          action: AppButton(
+          trailing: AppButton(
             label: 'Export',
             compact: true,
             loading: _busy,
@@ -178,7 +178,7 @@ class _DataScreenState extends ConsumerState<DataScreen> {
           ),
         ),
         const SizedBox(height: Space.sm),
-        DataRow2(
+        SettingsListRow(
           label: 'Import backup',
           value: ImportSource.perch.blurb,
           onTap: _busy ? null : _importPerch,
@@ -190,7 +190,7 @@ class _DataScreenState extends ConsumerState<DataScreen> {
           ImportSource.pocket,
           ImportSource.raindrop,
         ]) ...<Widget>[
-          DataRow2(
+          SettingsListRow(
             label: source.label,
             value: source.blurb,
             onTap: _busy ? null : () => _importSource(source),
@@ -201,12 +201,12 @@ class _DataScreenState extends ConsumerState<DataScreen> {
         if (refresh.running)
           const RefreshProgressCard()
         else
-          DataRow2(
+          SettingsListRow(
             label: 'Refresh previews',
             value: refresh.missing == 0
                 ? 'Every link has a preview image'
                 : '${plural(refresh.missing, 'link')} missing a preview image',
-            action: AppButton(
+            trailing: AppButton(
               label: 'Refresh',
               type: AppButtonType.secondary,
               compact: true,
@@ -248,81 +248,6 @@ class _GroupLabel extends StatelessWidget {
       ),
     ),
   );
-}
-
-/// Board 3g's row: a title, a line of detail, and either an action or a
-/// chevron. Same geometry as every other row in the app.
-class DataRow2 extends StatelessWidget {
-  const DataRow2({
-    required this.label,
-    required this.value,
-    this.action,
-    this.onTap,
-    super.key,
-  });
-
-  final String label;
-  final String value;
-  final Widget? action;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final PerchColors c = context.colors;
-    final Widget row = Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-      decoration: BoxDecoration(
-        color: c.surfaceContainer,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: c.outline),
-      ),
-      child: Row(
-        spacing: Space.md,
-        children: <Widget>[
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  label,
-                  style: PerchType.titleMedium.copyWith(
-                    fontSize: 14,
-                    color: c.onSurface,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  value,
-                  style: PerchType.bodySmall.copyWith(
-                    color: c.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (action != null)
-            action!
-          else if (onTap != null)
-            Icon(
-              Icons.chevron_right_rounded,
-              size: 20,
-              color: c.onSurfaceMuted,
-            ),
-        ],
-      ),
-    );
-
-    if (onTap == null) return row;
-    return Semantics(
-      button: true,
-      label: '$label, $value',
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
-        child: row,
-      ),
-    );
-  }
 }
 
 class _LastExportLine extends ConsumerWidget {

@@ -124,9 +124,14 @@ class TagChip extends StatelessWidget {
 
     // A chip that can be acted on carries a 48dp row, even though it only
     // paints ~32 (board 1j, TOUCH TARGETS).
+    // `widthFactor: 1` matters: without it the Center fills the width a Wrap
+    // offers and every chip lands on its own centred line.
     final Widget sized = onTap == null && onRemove == null
         ? chip
-        : SizedBox(height: IconSpec.tapTarget, child: Center(child: chip));
+        : SizedBox(
+            height: IconSpec.tapTarget,
+            child: Center(widthFactor: 1, child: chip),
+          );
 
     if (onTap == null) return sized;
     return Semantics(

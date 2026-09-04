@@ -105,14 +105,28 @@ class LinkList extends StatelessWidget {
       ),
       LinkViewMode.minimal => SliverPadding(
         padding: _side,
-        sliver: SliverList.builder(
-          itemCount: items.length,
-          itemBuilder: (BuildContext context, int i) {
-            if (paging) _maybeLoadMore(i);
-            return _MinimalRow(
-              isFirst: i == 0,
-              isLast: i == items.length - 1,
-              child: _card(context, items[i]),
+        sliver: Builder(
+          builder: (BuildContext context) {
+            final PerchColors c = context.colors;
+            // The group's background, outline and corners belong to the whole
+            // sliver — a per-row partial border cannot carry a radius, and
+            // asking one to throws.
+            return DecoratedSliver(
+              decoration: BoxDecoration(
+                color: c.surfaceContainer,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: c.outline),
+              ),
+              sliver: SliverList.builder(
+                itemCount: items.length,
+                itemBuilder: (BuildContext context, int i) {
+                  if (paging) _maybeLoadMore(i);
+                  return _MinimalRow(
+                    isFirst: i == 0,
+                    child: _card(context, items[i]),
+                  );
+                },
+              ),
             );
           },
         ),
@@ -160,37 +174,21 @@ class LinkList extends StatelessWidget {
   }
 }
 
-/// Minimal reads as one container with hairlines between rows rather than a
-/// card per link — but it is still built lazily, so each row draws the piece of
-/// the container it happens to sit at.
+/// Minimal reads as one container with hairlines between rows. The container
+/// is drawn by the sliver; a row only owns the hairline above it.
 class _MinimalRow extends StatelessWidget {
-  const _MinimalRow({
-    required this.child,
-    required this.isFirst,
-    required this.isLast,
-  });
+  const _MinimalRow({required this.child, required this.isFirst});
 
   final Widget child;
   final bool isFirst;
-  final bool isLast;
 
   @override
   Widget build(BuildContext context) {
     final PerchColors c = context.colors;
-    const Radius r = Radius.circular(16);
+    if (isFirst) return child;
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: c.surfaceContainer,
-        border: Border(
-          left: BorderSide(color: c.outline),
-          right: BorderSide(color: c.outline),
-          top: BorderSide(color: isFirst ? c.outline : c.divider),
-          bottom: isLast ? BorderSide(color: c.outline) : BorderSide.none,
-        ),
-        borderRadius: BorderRadius.vertical(
-          top: isFirst ? r : Radius.zero,
-          bottom: isLast ? r : Radius.zero,
-        ),
+        border: Border(top: BorderSide(color: c.divider)),
       ),
       child: child,
     );

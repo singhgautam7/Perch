@@ -225,9 +225,15 @@ class _AnimatedStripState extends State<_AnimatedStrip>
   SnackMessage get _m => widget.entry.message;
   bool get _top => _m.position == SnackPosition.top;
 
+  bool _armed = false;
+
   @override
-  void initState() {
-    super.initState();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Not initState: the dwell time asks MediaQuery whether reduced motion is
+    // on, and an inherited widget cannot be read until dependencies are ready.
+    if (_armed) return;
+    _armed = true;
     _restartTimer();
   }
 

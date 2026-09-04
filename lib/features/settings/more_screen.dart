@@ -51,87 +51,75 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
               ),
               children: <Widget>[
 
-          SettingsGroup(
-            label: 'General',
-            children: <Widget>[
-              SettingsRow(
-                icon: Icons.palette_outlined,
-                label: 'Appearance',
-                value: '${s.family.name} · ${_modeLabel(s.themeMode)}',
-                onTap: () => context.push(Routes.appearance),
-              ),
-              SettingsRow(
-                icon: Icons.sell_outlined,
-                label: 'Tags',
-                value: tagCount == null ? null : plural(tagCount, 'tag'),
-                onTap: () => context.push(Routes.tags),
-              ),
-              // Board 3g — Data is its own entry, next to Tags.
-              SettingsRow(
-                icon: Icons.swap_vert_rounded,
-                label: 'Data',
-                value: 'Export, import',
-                onTap: () => context.push(Routes.data),
-              ),
-              SettingsRow(
-                icon: Icons.flag_outlined,
-                label: 'Open on launch',
-                value: s.landingTab == LandingTab.folders ? 'Folders' : 'Links',
-                onTap: () => _pickLandingTab(s, controller),
-              ),
-              SettingsRow(
-                icon: Icons.view_agenda_outlined,
-                label: 'Default view mode',
-                value: s.viewMode.label,
-                onTap: () => _pickViewMode(s, controller),
-              ),
-            ],
+          // Board 3g — one flat list of rows, each showing its current value on
+          // the line below, so nothing needs an icon column or a group header.
+          SettingsListRow(
+            label: 'Appearance',
+            value: '${s.family.name} · ${_modeLabel(s.themeMode)}',
+            onTap: () => context.push(Routes.appearance),
           ),
-
-          SettingsGroup(
+          const SizedBox(height: Space.sm),
+          SettingsListRow(
+            label: 'Tags',
+            value: tagCount == null ? null : plural(tagCount, 'tag'),
+            onTap: () => context.push(Routes.tags),
+          ),
+          const SizedBox(height: Space.sm),
+          SettingsListRow(
+            label: 'Data',
+            value: 'Export, import',
+            onTap: () => context.push(Routes.data),
+          ),
+          const SizedBox(height: Space.sm),
+          SettingsListRow(
+            label: 'Open on launch',
+            value: s.landingTab == LandingTab.folders ? 'Folders' : 'Links',
+            onTap: () => _pickLandingTab(s, controller),
+          ),
+          const SizedBox(height: Space.sm),
+          SettingsListRow(
+            label: 'Default view',
+            value: s.viewMode.label,
+            onTap: () => _pickViewMode(s, controller),
+          ),
+          const SizedBox(height: Space.sm),
+          SettingsListRow(
+            label: 'Privacy',
+            value: 'Everything stays on this device',
+            onTap: () => context.push(Routes.privacy),
+          ),
+          const SizedBox(height: Space.sm),
+          SettingsListRow(
+            label: 'Permissions',
+            value: 'Internet only',
+            onTap: () => context.push(Routes.permissions),
+          ),
+          const SizedBox(height: Space.sm),
+          SettingsListRow(
             label: 'About Perch',
-            children: <Widget>[
-              SettingsRow(
-                icon: Icons.shield_outlined,
-                label: 'Privacy',
-                value: 'Everything stays on this device',
-                onTap: () => context.push(Routes.privacy),
-              ),
-              SettingsRow(
-                icon: Icons.key_outlined,
-                label: 'Permissions',
-                onTap: () => context.push(Routes.permissions),
-              ),
-              SettingsRow(
-                icon: Icons.info_outline_rounded,
-                label: 'About Perch',
-                value: 'free, no accounts',
-                onTap: () => context.push(Routes.about),
-              ),
-            ],
+            value: 'free, no accounts',
+            onTap: () => context.push(Routes.about),
           ),
+          const SizedBox(height: Space.lg),
 
           // Seven taps on the version line reveals Dev tools, and it stays
           // until toggled off.
-          if (s.devTools)
-            SettingsGroup(
-              label: 'Dev tools',
-              children: <Widget>[
-                SettingsRow(
-                  icon: Icons.storage_rounded,
-                  label: 'Database explorer',
-                  onTap: () => context.push(Routes.devTools),
-                ),
-                SettingsRow(
-                  icon: Icons.visibility_off_outlined,
-                  label: 'Hide dev tools',
-                  onTap: () {
-                    controller.setDevTools(value: false);
-                    setState(() => _versionTaps = 0);
-                  },
-                ),
-              ],
+          if (s.devTools) ...<Widget>[
+            SettingsListRow(
+              label: 'Database explorer',
+              value: 'Dev tools',
+              onTap: () => context.push(Routes.devTools),
             ),
+            const SizedBox(height: Space.sm),
+            SettingsListRow(
+              label: 'Hide dev tools',
+              onTap: () {
+                controller.setDevTools(value: false);
+                setState(() => _versionTaps = 0);
+              },
+            ),
+            const SizedBox(height: Space.lg),
+          ],
 
           GestureDetector(
             onTap: () {

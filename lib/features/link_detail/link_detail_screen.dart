@@ -22,7 +22,6 @@ import '../../shared/widgets/breadcrumb.dart';
 import '../../shared/widgets/link_thumbnail.dart';
 import '../../shared/widgets/states.dart';
 import '../../shared/widgets/tag_chip.dart';
-import '../../shared/widgets/tag_picker.dart';
 import '../folders/folder_providers.dart';
 import '../links/link_actions.dart';
 import '../links/link_feed.dart';
@@ -90,15 +89,6 @@ class _DetailState extends ConsumerState<_Detail> {
   /// B8 — a tick in the note writes straight back into the markdown.
   Future<void> _saveNote(String markdown) =>
       _repo.update(_link.id, LinksCompanion(note: Value<String>(markdown)));
-
-  Future<void> _editTags() async {
-    final List<int>? picked = await showTagPicker(
-      context,
-      selected: widget.data.tags.map((Tag t) => t.id).toList(growable: false),
-    );
-    if (picked == null) return;
-    await ref.read(tagRepositoryProvider).setForLinkByIds(_link.id, picked);
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -207,8 +197,10 @@ class _DetailState extends ConsumerState<_Detail> {
                   ),
                 ),
               ),
-              const SizedBox(height: Space.md),
-              _TagRow(data: widget.data, onAdd: _editTags),
+              if (widget.data.tags.isNotEmpty) ...<Widget>[
+                const SizedBox(height: Space.md),
+                _TagRow(data: widget.data),
+              ],
               const SizedBox(height: Space.lg),
               Container(
                 padding: const EdgeInsets.all(14),
@@ -340,12 +332,13 @@ class _OverflowButton extends ConsumerWidget {
 }
 
 /// Board 3d — tags are real chips in their own colour and each one filters.
-/// `＋ Add tag` is a quiet dashed chip *after* them, never a replacement.
+///
+/// There is no add affordance here: tags are changed on the Add/Edit screen the
+/// header pencil opens, which is the one place that edits a link.
 class _TagRow extends StatelessWidget {
-  const _TagRow({required this.data, required this.onAdd});
+  const _TagRow({required this.data});
 
   final LinkWithTags data;
-  final VoidCallback onAdd;
 
   @override
   Widget build(BuildContext context) {
@@ -362,7 +355,6 @@ class _TagRow extends StatelessWidget {
             color: c.tagColor(tag.color),
             onTap: () => context.push(Routes.tagged(tag.id)),
           ),
-        TagChip(label: 'Add tag', add: true, onTap: onAdd),
       ],
     );
   }

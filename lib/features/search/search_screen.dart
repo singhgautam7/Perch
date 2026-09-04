@@ -231,7 +231,8 @@ class _QuickChips extends ConsumerWidget {
         ];
 
     return SizedBox(
-      height: 46,
+      // The chip carries a 48dp target; the row has to be at least that tall.
+      height: IconSpec.tapTarget,
       child: ListView(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.fromLTRB(Space.screen, 0, Space.screen, 0),

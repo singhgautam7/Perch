@@ -6,6 +6,89 @@ import '../../core/theme/tokens.dart';
 import '../../core/theme/typography.dart';
 import '../../shared/widgets/app_icon_button.dart';
 
+/// Board 3g — the settings row: a title, its current value on the line below,
+/// and either a trailing control or a chevron.
+///
+/// The value sits *under* the label rather than beside it, which is what keeps
+/// a long value ("Everything stays on this device") from overflowing the row at
+/// a large OS text scale. More and Data share this row.
+class SettingsListRow extends StatelessWidget {
+  const SettingsListRow({
+    required this.label,
+    this.value,
+    this.trailing,
+    this.onTap,
+    super.key,
+  });
+
+  final String label;
+  final String? value;
+
+  /// Replaces the chevron — a button, or a switch.
+  final Widget? trailing;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final PerchColors c = context.colors;
+    final Widget row = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+      decoration: BoxDecoration(
+        color: c.surfaceContainer,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: c.outline),
+      ),
+      child: Row(
+        spacing: Space.md,
+        children: <Widget>[
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  label,
+                  style: PerchType.titleMedium.copyWith(
+                    fontSize: 14,
+                    color: c.onSurface,
+                  ),
+                ),
+                if (value != null) ...<Widget>[
+                  const SizedBox(height: 3),
+                  Text(
+                    value!,
+                    style: PerchType.bodySmall.copyWith(
+                      color: c.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          if (trailing != null)
+            trailing!
+          else if (onTap != null)
+            Icon(
+              Icons.chevron_right_rounded,
+              size: 20,
+              color: c.onSurfaceMuted,
+            ),
+        ],
+      ),
+    );
+
+    if (onTap == null) return row;
+    return Semantics(
+      button: true,
+      label: value == null ? label : '$label, $value',
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: row,
+      ),
+    );
+  }
+}
+
 /// A titled group of rows, drawn as one rounded container with hairlines
 /// between them.
 class SettingsGroup extends StatelessWidget {
