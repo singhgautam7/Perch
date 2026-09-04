@@ -41,14 +41,44 @@ Source of truth for how code in this repo is written. Read before changing anyth
   infrastructure in `lib/core/`.
 - Repository/service layer sits over Drift. **No business logic in widgets.**
 - Reuse the shared widgets. If two elements share a layout or background, they share a
-  widget — `AppButton`, `AppIconButton`, `AppBottomSheet`, `AppSnackbar`, link/folder
-  cards, tag chip, breadcrumb, empty/loading/error states. Do not duplicate.
+  widget. Do not duplicate. Each of these has exactly one implementation:
+
+| Need | Use |
+|---|---|
+| Screen top bar | `AppHeader` — title + optional back + trailing actions |
+| Any icon action (back, search, share, overflow, edit, view switcher, close) | `AppIconButton` |
+| Anchored menu (view switcher, long-press, overflow) | `showAppMenu` + `AppMenuEntry` |
+| Bottom sheet (incl. full-height with sticky header/footer) | `showAppBottomSheet(expand: true)` |
+| Single choice in a sheet | `showOptionSheet` |
+| Button | `AppButton` |
+| Text field in a labelled box | `LabelledField` + `PlainTextField` |
+| Colour choice | `ColorSwatchRow` |
+| Tag chip (10.5px card form, pill form, dashed add) | `TagChip` |
+| Choosing tags | `showTagPicker` |
+| Choosing a folder | `showFolderPicker` |
+| Creating a folder or tag inline | `NewFolderRow` |
+| Toast / confirmation | `AppSnackbar` (info · success · warning · error) |
+| Dashed outline | `DashedBorderPainter` |
+| `LABEL · 128` + sort row | `SectionHeader` |
+| Link list, incl. pinned section and selection | `LinkList` |
+| Quick actions on a link | `showLinkQuickMenu` / `runLinkAction` |
+
+- **Add and Edit are one route** (`/link/edit`, optional `?id=`). There is no separate
+  edit screen and no separate note editor.
 - Small files; one widget per file where reasonable; clear names.
+
+## Colour
+
+- Tag and folder colours are stored as an **index into `PerchColors.tagHues`**, never as
+  an ARGB value, so they re-derive per theme and stay legible in light, dark and AMOLED.
+  Resolve with `context.colors.tagColor(index)` / `folderTint(index)`.
+- The snackbar's four variants resolve through `context.colors.snack(variant)`.
 
 ## Data
 
-- Every schema change bumps the Drift `schemaVersion` with a written migration **and** a
-  migration test.
+- **Dev phase:** a schema change bumps `schemaVersion` and `onUpgrade` drops and
+  recreates the database. Before release this becomes a real migration path — every
+  schema change will then need a written migration **and** a migration test.
 - Import/export must round-trip losslessly (folders as a parentId tree, links with tags
   and markdown note inline).
 
