@@ -65,13 +65,41 @@ Future<void> _rename(
   WidgetRef ref,
   Folder folder,
 ) async {
-  final TextEditingController controller = TextEditingController(
-    text: folder.name,
-  );
   final String? name = await showAppBottomSheet<String>(
     context: context,
     title: 'Rename folder',
-    builder: (BuildContext sheetContext) => Column(
+    builder: (BuildContext sheetContext) =>
+        _RenameFolderSheet(initialName: folder.name),
+  );
+
+  final String trimmed = name?.trim() ?? '';
+  if (trimmed.isEmpty || trimmed == folder.name) return;
+  await ref.read(folderRepositoryProvider).rename(folder.id, trimmed);
+}
+
+class _RenameFolderSheet extends StatefulWidget {
+  const _RenameFolderSheet({required this.initialName});
+
+  final String initialName;
+
+  @override
+  State<_RenameFolderSheet> createState() => _RenameFolderSheetState();
+}
+
+class _RenameFolderSheetState extends State<_RenameFolderSheet> {
+  late final TextEditingController _controller = TextEditingController(
+    text: widget.initialName,
+  );
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
@@ -79,10 +107,10 @@ Future<void> _rename(
           label: 'Name',
           focused: true,
           child: PlainTextField(
-            controller: controller,
+            controller: _controller,
             autofocus: true,
             hint: 'Folder name',
-            onSubmitted: (String v) => Navigator.of(sheetContext).pop(v),
+            onSubmitted: (String v) => Navigator.of(context).pop(v.trim()),
           ),
         ),
         const SizedBox(height: Space.lg),
@@ -90,16 +118,11 @@ Future<void> _rename(
           label: 'Save',
           fullWidth: true,
           onPressed: () =>
-              Navigator.of(sheetContext).pop(controller.text.trim()),
+              Navigator.of(context).pop(_controller.text.trim()),
         ),
       ],
-    ),
-  );
-  controller.dispose();
-
-  final String trimmed = name?.trim() ?? '';
-  if (trimmed.isEmpty || trimmed == folder.name) return;
-  await ref.read(folderRepositoryProvider).rename(folder.id, trimmed);
+    );
+  }
 }
 
 Future<void> _recolor(

@@ -40,6 +40,8 @@ abstract final class Routes {
   static String folder(int id) => '/folders/$id';
   static String link(int id) => '/link/$id';
   static String editLink(int id) => '$add?id=$id';
+  static String addLink({int? folderId}) =>
+      folderId == null ? add : '$add?folder=$folderId';
 
   /// Search, landing with one tag already applied (board 3c).
   static String tagged(int tagId) => '$search?tag=$tagId';
@@ -66,8 +68,10 @@ GoRouter buildRouter({required AppSettings settings}) {
         path: Routes.add,
         builder: (BuildContext c, GoRouterState s) {
           final String? id = s.uri.queryParameters['id'];
+          final String? folder = s.uri.queryParameters['folder'];
           return LinkEditScreen(
             linkId: id == null ? null : int.tryParse(id),
+            initialFolderId: folder == null ? null : int.tryParse(folder),
             sharedUrl: s.uri.queryParameters['url'],
           );
         },
@@ -124,7 +128,17 @@ GoRouter buildRouter({required AppSettings settings}) {
                 tabCount: shell.route.branches.length,
                 onSelect: (int i) =>
                     shell.goBranch(i, initialLocation: i == shell.currentIndex),
-                onAdd: () => context.push(Routes.add),
+                onAdd: () {
+                  final List<String> segments = state.uri.pathSegments;
+                  if (segments.length >= 2 && segments[0] == 'folders') {
+                    final int? folderId = int.tryParse(segments[1]);
+                    if (folderId != null) {
+                      context.push(Routes.addLink(folderId: folderId));
+                      return;
+                    }
+                  }
+                  context.push(Routes.add);
+                },
                 child: shell,
               );
             },

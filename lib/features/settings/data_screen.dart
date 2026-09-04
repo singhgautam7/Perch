@@ -68,39 +68,20 @@ class _DataScreenState extends ConsumerState<DataScreen> {
   /// Perch asks for no storage permission, so a file is handed over the same
   /// way any other text is: pasted in.
   Future<String?> _askForFile(ImportSource source, String warning) async {
-    final TextEditingController controller = TextEditingController();
     final ClipboardData? clip = await Clipboard.getData(Clipboard.kTextPlain);
-    if ((clip?.text?.length ?? 0) > 40) controller.text = clip!.text!;
+    final String initial =
+        (clip?.text?.length ?? 0) > 40 ? clip!.text! : '';
     if (!mounted) return null;
 
-    final bool? go = await showAppBottomSheet<bool>(
+    return showAppBottomSheet<String>(
       context: context,
       title: 'Import ${source.label}',
       description: warning,
-      builder: (BuildContext sheetContext) => Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: <Widget>[
-          TextField(
-            controller: controller,
-            maxLines: 6,
-            style: PerchType.monoSmall,
-            decoration: InputDecoration(
-              hintText: 'Paste the contents of your ${source.label} export',
-            ),
-          ),
-          const SizedBox(height: Space.lg),
-          AppButton(
-            label: 'Import',
-            fullWidth: true,
-            onPressed: () => Navigator.of(sheetContext).pop(true),
-          ),
-        ],
+      builder: (BuildContext sheetContext) => _ImportFileSheet(
+        source: source,
+        initialText: initial,
       ),
     );
-    final String? text = go == true ? controller.text : null;
-    controller.dispose();
-    return text;
   }
 
   Future<void> _importPerch() async {
@@ -351,6 +332,52 @@ class _DataRow extends StatelessWidget {
         borderRadius: BorderRadius.circular(18),
         child: row,
       ),
+    );
+  }
+}
+
+class _ImportFileSheet extends StatefulWidget {
+  const _ImportFileSheet({required this.source, required this.initialText});
+
+  final ImportSource source;
+  final String initialText;
+
+  @override
+  State<_ImportFileSheet> createState() => _ImportFileSheetState();
+}
+
+class _ImportFileSheetState extends State<_ImportFileSheet> {
+  late final TextEditingController _controller = TextEditingController(
+    text: widget.initialText,
+  );
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        TextField(
+          controller: _controller,
+          maxLines: 6,
+          style: PerchType.monoSmall,
+          decoration: InputDecoration(
+            hintText: 'Paste the contents of your ${widget.source.label} export',
+          ),
+        ),
+        const SizedBox(height: Space.lg),
+        AppButton(
+          label: 'Import',
+          fullWidth: true,
+          onPressed: () => Navigator.of(context).pop(_controller.text),
+        ),
+      ],
     );
   }
 }

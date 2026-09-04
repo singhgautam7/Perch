@@ -36,10 +36,16 @@ import '../folders/folder_providers.dart';
 /// Nothing here is a bottom sheet: that form is reserved for the share flow,
 /// where the system gives us less room and less time.
 class LinkEditScreen extends ConsumerStatefulWidget {
-  const LinkEditScreen({this.linkId, this.sharedUrl, super.key});
+  const LinkEditScreen({
+    this.linkId,
+    this.initialFolderId,
+    this.sharedUrl,
+    super.key,
+  });
 
   /// Null adds; a value edits that link.
   final int? linkId;
+  final int? initialFolderId;
   final String? sharedUrl;
 
   @override
@@ -74,6 +80,9 @@ class _LinkEditScreenState extends ConsumerState<LinkEditScreen> {
       _loading = true;
       unawaited(_load());
     } else {
+      if (widget.initialFolderId != null) {
+        _initFolder(widget.initialFolderId!);
+      }
       _url.text = widget.sharedUrl ?? '';
       if (_hasUrl) _scheduleFetch();
       unawaited(_offerClipboard());
@@ -113,6 +122,29 @@ class _LinkEditScreenState extends ConsumerState<LinkEditScreen> {
             : paths[link.folderId!] ?? 'Folder',
       );
       _loading = false;
+    });
+  }
+
+  void _initFolder(int folderId) {
+    final Map<int, String> paths = ref.read(folderPathsProvider);
+    if (paths.containsKey(folderId)) {
+      _folder = (folderId: folderId, name: paths[folderId]!);
+    } else {
+      _folder = (folderId: folderId, name: 'Folder');
+      unawaited(_resolveFolderName(folderId));
+    }
+  }
+
+  Future<void> _resolveFolderName(int folderId) async {
+    final Folder? folder =
+        await ref.read(folderRepositoryProvider).byId(folderId);
+    if (!mounted || folder == null) return;
+    final Map<int, String> paths = ref.read(folderPathsProvider);
+    setState(() {
+      _folder = (
+        folderId: folder.id,
+        name: paths[folder.id] ?? folder.name,
+      );
     });
   }
 
