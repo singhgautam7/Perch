@@ -164,7 +164,7 @@ class _DataScreenState extends ConsumerState<DataScreen> {
     return SettingsScaffold(
       title: 'Data',
       children: <Widget>[
-        SettingsListRow(
+        _DataRow(
           label: 'Export backup',
           value: stats == null
               ? 'Everything, as one JSON file'
@@ -178,7 +178,7 @@ class _DataScreenState extends ConsumerState<DataScreen> {
           ),
         ),
         const SizedBox(height: Space.sm),
-        SettingsListRow(
+        _DataRow(
           label: 'Import backup',
           value: ImportSource.perch.blurb,
           onTap: _busy ? null : _importPerch,
@@ -190,7 +190,7 @@ class _DataScreenState extends ConsumerState<DataScreen> {
           ImportSource.pocket,
           ImportSource.raindrop,
         ]) ...<Widget>[
-          SettingsListRow(
+          _DataRow(
             label: source.label,
             value: source.blurb,
             onTap: _busy ? null : () => _importSource(source),
@@ -201,7 +201,7 @@ class _DataScreenState extends ConsumerState<DataScreen> {
         if (refresh.running)
           const RefreshProgressCard()
         else
-          SettingsListRow(
+          _DataRow(
             label: 'Refresh previews',
             value: refresh.missing == 0
                 ? 'Every link has a preview image'
@@ -277,6 +277,80 @@ class _LastExportLine extends ConsumerWidget {
               style: PerchType.monoSmall.copyWith(color: c.onSurfaceMuted),
             );
           },
+    );
+  }
+}
+
+/// Board 3g's Data row: a title, a line of detail, and either an action or a
+/// chevron. Only this page uses it — More keeps board 2e's grouped rows.
+class _DataRow extends StatelessWidget {
+  const _DataRow({
+    required this.label,
+    required this.value,
+    this.trailing,
+    this.onTap,
+  });
+
+  final String label;
+  final String value;
+  final Widget? trailing;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final PerchColors c = context.colors;
+    final Widget row = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+      decoration: BoxDecoration(
+        color: c.surfaceContainer,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: c.outline),
+      ),
+      child: Row(
+        spacing: Space.md,
+        children: <Widget>[
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  label,
+                  style: PerchType.titleMedium.copyWith(
+                    fontSize: 14,
+                    color: c.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  value,
+                  style: PerchType.bodySmall.copyWith(
+                    color: c.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (trailing != null)
+            trailing!
+          else if (onTap != null)
+            Icon(
+              Icons.chevron_right_rounded,
+              size: 20,
+              color: c.onSurfaceMuted,
+            ),
+        ],
+      ),
+    );
+
+    if (onTap == null) return row;
+    return Semantics(
+      button: true,
+      label: '$label, $value',
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: row,
+      ),
     );
   }
 }

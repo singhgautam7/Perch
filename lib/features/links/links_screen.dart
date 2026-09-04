@@ -43,77 +43,81 @@ class LinksScreen extends ConsumerWidget {
         const <LinkWithTags>[];
     final LinkSelection selection = ref.watch(linkSelectionProvider);
 
-    return SafeArea(
-      bottom: false,
-      child: Stack(
-        children: <Widget>[
-          Column(
-            children: <Widget>[
-              if (selection.active)
-                SelectionBar(
-                  visible: feed.valueOrNull?.items ?? const <LinkWithTags>[],
-                )
-              else
-                AppHeader(
-                  title: 'Links',
-                  actions: <Widget>[
-                    AppIconButton(
-                      icon: Icons.search_rounded,
-                      onPressed: () => context.push(Routes.search),
-                      semanticLabel: 'Search links',
-                    ),
-                    ViewModeButton(
-                      mode: mode,
-                      onChanged: (LinkViewMode m) =>
-                          ref.read(settingsProvider.notifier).setViewMode(m),
-                    ),
-                    ListOverflowButton(sort: sort),
-                  ],
-                ),
-              Expanded(
-                // A save re-runs the feed; keeping the last page on screen while
-                // it reloads stops the whole list flashing skeletons.
-                child: switch (feed) {
-                  AsyncValue<LinkFeed>(:final LinkFeed value?) =>
-                    value.items.isEmpty && pinned.isEmpty
-                        ? EmptyState(
-                            title: 'Nothing perched yet',
-                            message:
-                                'Share a link from any app and it lands here. '
-                                'Or tap ＋ to paste one.',
-                            actionLabel: 'Add your first link',
-                            onAction: () => context.push(Routes.add),
-                          )
-                        : LinkList(
-                            feed: value,
-                            mode: mode,
-                            pinned: pinned,
-                            countLabel: pinned.isEmpty
-                                ? 'All links · ${grouped(count)}'
-                                : 'Everything else · '
-                                      '${grouped(count - pinned.length)}',
-                            countTrailing: SortControl(sort: sort),
-                            paths: ref.watch(folderPathsProvider),
-                            selection: selection,
-                            onTapLink: (LinkWithTags item) =>
-                                onLinkTapped(context, ref, item, selection),
-                            onLongPressLink: (LinkWithTags item, Offset at) =>
-                                onLinkHeld(context, ref, item, at, selection),
-                            onLoadMore: () => ref
-                                .read(linkFeedProvider(kAllLinks).notifier)
-                                .loadMore(),
-                          ),
-                  AsyncValue<LinkFeed>(:final Object error?) => ErrorStateView(
-                    message: '$error',
-                    onRetry: () => ref.invalidate(linkFeedProvider(kAllLinks)),
+    return SelectionScope(
+      child: SafeArea(
+        bottom: false,
+        child: Stack(
+          children: <Widget>[
+            Column(
+              children: <Widget>[
+                if (selection.active)
+                  SelectionBar(
+                    visible: feed.valueOrNull?.items ?? const <LinkWithTags>[],
+                  )
+                else
+                  AppHeader(
+                    title: 'Links',
+                    actions: <Widget>[
+                      AppIconButton(
+                        icon: Icons.search_rounded,
+                        onPressed: () => context.push(Routes.search),
+                        semanticLabel: 'Search links',
+                      ),
+                      ViewModeButton(
+                        mode: mode,
+                        onChanged: (LinkViewMode m) =>
+                            ref.read(settingsProvider.notifier).setViewMode(m),
+                      ),
+                      ListOverflowButton(sort: sort),
+                    ],
                   ),
-                  _ => const ListSkeleton(),
-                },
-              ),
-            ],
-          ),
-          if (selection.active) const SelectionActionBar(),
-        ],
+                Expanded(
+                  // A save re-runs the feed; keeping the last page on screen while
+                  // it reloads stops the whole list flashing skeletons.
+                  child: switch (feed) {
+                    AsyncValue<LinkFeed>(:final LinkFeed value?) =>
+                      value.items.isEmpty && pinned.isEmpty
+                          ? EmptyState(
+                              title: 'Nothing perched yet',
+                              message:
+                                  'Share a link from any app and it lands here. '
+                                  'Or tap ＋ to paste one.',
+                              actionLabel: 'Add your first link',
+                              onAction: () => context.push(Routes.add),
+                            )
+                          : LinkList(
+                              feed: value,
+                              mode: mode,
+                              pinned: pinned,
+                              countLabel: pinned.isEmpty
+                                  ? 'All links · ${grouped(count)}'
+                                  : 'Everything else · '
+                                        '${grouped(count - pinned.length)}',
+                              countTrailing: SortControl(sort: sort),
+                              paths: ref.watch(folderPathsProvider),
+                              selection: selection,
+                              onTapLink: (LinkWithTags item) =>
+                                  onLinkTapped(context, ref, item, selection),
+                              onLongPressLink: (LinkWithTags item, Offset at) =>
+                                  onLinkHeld(context, ref, item, at, selection),
+                              onLoadMore: () => ref
+                                  .read(linkFeedProvider(kAllLinks).notifier)
+                                  .loadMore(),
+                            ),
+                    AsyncValue<LinkFeed>(:final Object error?) =>
+                      ErrorStateView(
+                        message: '$error',
+                        onRetry: () =>
+                            ref.invalidate(linkFeedProvider(kAllLinks)),
+                      ),
+                    _ => const ListSkeleton(),
+                  },
+                ),
+              ],
+            ),
+            if (selection.active) const SelectionActionBar(),
+          ],
+        ),
       ),
     );
   }

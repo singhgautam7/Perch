@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Board 3f — long-press enters selection; the header becomes a selection bar
@@ -46,3 +46,30 @@ linkSelectionProvider =
     NotifierProvider<LinkSelectionNotifier, LinkSelection>(
       LinkSelectionNotifier.new,
     );
+
+/// Board 3f — selection is a mode, and back is how you leave a mode.
+///
+/// `PopScope` is no use here: go_router's shell gives each tab its own
+/// Navigator, and the back press never reaches the branch route's pop
+/// disposition — it just finishes the activity. `BackButtonListener` hooks the
+/// Router's own dispatcher, which does see it first.
+class SelectionScope extends ConsumerWidget {
+  const SelectionScope({required this.child, super.key});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final bool active = ref.watch(
+      linkSelectionProvider.select((LinkSelection s) => s.active),
+    );
+    if (!active) return child;
+    return BackButtonListener(
+      onBackButtonPressed: () async {
+        ref.read(linkSelectionProvider.notifier).clear();
+        return true;
+      },
+      child: child,
+    );
+  }
+}

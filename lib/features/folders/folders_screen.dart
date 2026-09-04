@@ -59,72 +59,74 @@ class FoldersScreen extends ConsumerWidget {
       linkFeedProvider(folderScope(folderId)),
     );
 
-    return SafeArea(
-      bottom: false,
-      child: Stack(
-        children: <Widget>[
-          Column(
-            children: <Widget>[
-              if (selection.active)
-                SelectionBar(
-                  visible: feed.valueOrNull?.items ?? const <LinkWithTags>[],
-                )
-              else
-                AppHeader(
-                  title: folder?.name ?? 'Folders',
-                  foreground: tinted ? tint.onContainer : null,
-                  background: tinted ? tint.headerTint : null,
-                  onBack: folderId == null
-                      ? null
-                      // A breadcrumb jump resets the branch stack, so back has
-                      // to be able to fall through to the parent folder.
-                      : () => context.canPop()
-                            ? context.pop()
-                            : context.go(
-                                folder?.parentId == null
-                                    ? Routes.folders
-                                    : Routes.folder(folder!.parentId!),
-                              ),
-                  actions: <Widget>[
-                    AppIconButton(
-                      icon: Icons.search_rounded,
-                      onPressed: () => context.push(Routes.search),
-                      semanticLabel: 'Search links',
-                      tint: tinted ? tint.onContainer : null,
-                    ),
-                    ViewModeButton(
-                      mode: settings.viewMode,
-                      onChanged: (LinkViewMode m) =>
-                          ref.read(settingsProvider.notifier).setViewMode(m),
-                    ),
-                    if (folder == null)
-                      ListOverflowButton(sort: settings.sort)
-                    else
-                      _FolderOverflowButton(folder: folder),
-                  ],
+    return SelectionScope(
+      child: SafeArea(
+        bottom: false,
+        child: Stack(
+          children: <Widget>[
+            Column(
+              children: <Widget>[
+                if (selection.active)
+                  SelectionBar(
+                    visible: feed.valueOrNull?.items ?? const <LinkWithTags>[],
+                  )
+                else
+                  AppHeader(
+                    title: folder?.name ?? 'Folders',
+                    foreground: tinted ? tint.onContainer : null,
+                    background: tinted ? tint.headerTint : null,
+                    onBack: folderId == null
+                        ? null
+                        // A breadcrumb jump resets the branch stack, so back has
+                        // to be able to fall through to the parent folder.
+                        : () => context.canPop()
+                              ? context.pop()
+                              : context.go(
+                                  folder?.parentId == null
+                                      ? Routes.folders
+                                      : Routes.folder(folder!.parentId!),
+                                ),
+                    actions: <Widget>[
+                      AppIconButton(
+                        icon: Icons.search_rounded,
+                        onPressed: () => context.push(Routes.search),
+                        semanticLabel: 'Search links',
+                        tint: tinted ? tint.onContainer : null,
+                      ),
+                      ViewModeButton(
+                        mode: settings.viewMode,
+                        onChanged: (LinkViewMode m) =>
+                            ref.read(settingsProvider.notifier).setViewMode(m),
+                      ),
+                      if (folder == null)
+                        ListOverflowButton(sort: settings.sort)
+                      else
+                        _FolderOverflowButton(folder: folder),
+                    ],
+                  ),
+                _LocationLine(folderId: folderId, tint: tinted ? tint : null),
+                Expanded(
+                  child: switch (children) {
+                    AsyncValue<List<FolderSummary>>(
+                      :final List<FolderSummary> value?,
+                    ) =>
+                      _Body(
+                        folderId: folderId,
+                        folders: value,
+                        settings: settings,
+                        tint: tint,
+                        selection: selection,
+                      ),
+                    AsyncValue<List<FolderSummary>>(:final Object error?) =>
+                      ErrorStateView(message: '$error'),
+                    _ => const SizedBox.shrink(),
+                  },
                 ),
-              _LocationLine(folderId: folderId, tint: tinted ? tint : null),
-              Expanded(
-                child: switch (children) {
-                  AsyncValue<List<FolderSummary>>(
-                    :final List<FolderSummary> value?,
-                  ) =>
-                    _Body(
-                      folderId: folderId,
-                      folders: value,
-                      settings: settings,
-                      tint: tint,
-                      selection: selection,
-                    ),
-                  AsyncValue<List<FolderSummary>>(:final Object error?) =>
-                    ErrorStateView(message: '$error'),
-                  _ => const SizedBox.shrink(),
-                },
-              ),
-            ],
-          ),
-          if (selection.active) const SelectionActionBar(),
-        ],
+              ],
+            ),
+            if (selection.active) const SelectionActionBar(),
+          ],
+        ),
       ),
     );
   }

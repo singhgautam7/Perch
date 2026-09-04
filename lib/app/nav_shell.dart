@@ -89,37 +89,38 @@ class _NavShellState extends ConsumerState<NavShell>
               behavior: HitTestBehavior.translucent,
               child: widget.child,
             ),
-            if (!selecting) Positioned(
-              left: 0,
-              right: 0,
-              bottom: 22,
-              child: RepaintBoundary(
-                child: AnimatedBuilder(
-                  animation: _hide,
-                  builder: (BuildContext context, Widget? child) {
-                    final double t = _hide.value;
-                    return Opacity(
-                      opacity: 1 - t,
-                      child: Transform.translate(
-                        offset: Offset(0, reduced ? 0 : 72 * t),
-                        child: IgnorePointer(ignoring: t > 0.5, child: child),
-                      ),
-                    );
-                  },
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    spacing: Space.row,
-                    children: <Widget>[
-                      PerchNavPill(
-                        index: widget.index,
-                        onSelect: widget.onSelect,
-                      ),
-                      PerchFab(onTap: widget.onAdd),
-                    ],
+            if (!selecting)
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 22,
+                child: RepaintBoundary(
+                  child: AnimatedBuilder(
+                    animation: _hide,
+                    builder: (BuildContext context, Widget? child) {
+                      final double t = _hide.value;
+                      return Opacity(
+                        opacity: 1 - t,
+                        child: Transform.translate(
+                          offset: Offset(0, reduced ? 0 : 72 * t),
+                          child: IgnorePointer(ignoring: t > 0.5, child: child),
+                        ),
+                      );
+                    },
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      spacing: Space.row,
+                      children: <Widget>[
+                        PerchNavPill(
+                          index: widget.index,
+                          onSelect: widget.onSelect,
+                        ),
+                        PerchFab(onTap: widget.onAdd),
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
           ],
         ),
       ),
