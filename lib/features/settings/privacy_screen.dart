@@ -4,14 +4,13 @@ import '../../core/theme/app_theme.dart';
 import '../../core/theme/palette.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/theme/typography.dart';
-import 'import_export_screen.dart';
 import 'settings_widgets.dart';
 
 /// Board 1i — leads with the sentence from the brief, at display size, then
 /// three claims a reader can check.
 ///
-/// Import/Export appears here too, because "where does my data live" and "how
-/// do I take it with me" are the same question.
+/// Board 3g — Privacy keeps only the explanation. Import and export moved to
+/// the Data page: they share a story with this, not a job.
 class PrivacyScreen extends StatelessWidget {
   const PrivacyScreen({super.key});
 
@@ -50,8 +49,6 @@ class PrivacyScreen extends StatelessWidget {
           _Claim(title: claim.$1, body: claim.$2),
           const SizedBox(height: Space.row),
         ],
-        const SizedBox(height: Space.lg),
-        const BackupCard(),
       ],
     );
   }

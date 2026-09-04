@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/theme/tokens.dart';
+import '../features/links/link_selection.dart';
 import 'nav_bar.dart';
 
 /// Hosts the four destinations and the floating nav.
 ///
 /// The pill and the FAB translate down 72 and fade out on scroll-down past
 /// 24px, and come back on any scroll-up (board 1b, "Scroll behaviour").
-class NavShell extends StatefulWidget {
+class NavShell extends ConsumerStatefulWidget {
   const NavShell({
     required this.child,
     required this.index,
@@ -24,10 +26,10 @@ class NavShell extends StatefulWidget {
   final int tabCount;
 
   @override
-  State<NavShell> createState() => _NavShellState();
+  ConsumerState<NavShell> createState() => _NavShellState();
 }
 
-class _NavShellState extends State<NavShell>
+class _NavShellState extends ConsumerState<NavShell>
     with SingleTickerProviderStateMixin {
   late final AnimationController _hide = AnimationController(
     vsync: this,
@@ -71,6 +73,10 @@ class _NavShellState extends State<NavShell>
   @override
   Widget build(BuildContext context) {
     final bool reduced = Motion.reduced(context);
+    // Board 3f — the bulk action bar takes the pill's place while selecting.
+    final bool selecting = ref.watch(
+      linkSelectionProvider.select((LinkSelection s) => s.active),
+    );
     return Scaffold(
       body: NotificationListener<ScrollNotification>(
         onNotification: _onScroll,
@@ -83,7 +89,7 @@ class _NavShellState extends State<NavShell>
               behavior: HitTestBehavior.translucent,
               child: widget.child,
             ),
-            Positioned(
+            if (!selecting) Positioned(
               left: 0,
               right: 0,
               bottom: 22,

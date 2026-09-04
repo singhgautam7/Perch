@@ -6,6 +6,19 @@ import 'link_repository.dart';
 /// How multiple selected tags combine.
 enum TagMatch { any, all }
 
+/// Board 3e — the Any / Yes / No segments.
+enum Tri {
+  any,
+  yes,
+  no;
+
+  String get label => switch (this) {
+    Tri.any => 'Any',
+    Tri.yes => 'Yes',
+    Tri.no => 'No',
+  };
+}
+
 enum DatePreset {
   anyTime,
   today,
@@ -30,34 +43,64 @@ class SearchFilters {
     this.includeSubfolders = true,
     this.tagIds = const <int>{},
     this.tagMatch = TagMatch.any,
-    this.hasNote = false,
-    this.hasImage = false,
-    this.domain,
+    this.hasNote = Tri.any,
+    this.hasPreview = Tri.any,
+    this.domains = const <String>{},
     this.datePreset = DatePreset.anyTime,
     this.from,
     this.to,
     this.sort = LinkSort.newest,
+    this.unsorted = false,
+    this.untagged = false,
+    this.unopened = false,
+    this.favorites = false,
   });
 
   final int? folderId;
   final bool includeSubfolders;
   final Set<int> tagIds;
   final TagMatch tagMatch;
-  final bool hasNote;
-  final bool hasImage;
-  final String? domain;
+  final Tri hasNote;
+  final Tri hasPreview;
+  final Set<String> domains;
   final DatePreset datePreset;
   final DateTime? from;
   final DateTime? to;
   final LinkSort sort;
 
+  // B5 — the five quick chips. They set the same state the sheet does.
+  final bool unsorted;
+  final bool untagged;
+  final bool unopened;
+  final bool favorites;
+
   bool get isEmpty =>
       folderId == null &&
       tagIds.isEmpty &&
-      !hasNote &&
-      !hasImage &&
-      domain == null &&
-      datePreset == DatePreset.anyTime;
+      hasNote == Tri.any &&
+      hasPreview == Tri.any &&
+      domains.isEmpty &&
+      datePreset == DatePreset.anyTime &&
+      !unsorted &&
+      !untagged &&
+      !unopened &&
+      !favorites;
+
+  /// How many groups are narrowing the result — the count on the Filter pill.
+  int get activeCount {
+    int n = 0;
+    if (folderId != null) n++;
+    if (tagIds.isNotEmpty) n++;
+    if (hasNote != Tri.any) n++;
+    if (hasPreview != Tri.any) n++;
+    if (domains.isNotEmpty) n++;
+    if (datePreset != DatePreset.anyTime) n++;
+    if (unsorted) n++;
+    if (untagged) n++;
+    if (unopened) n++;
+    if (favorites) n++;
+    return n;
+  }
 
   SearchFilters copyWith({
     int? folderId,
@@ -65,14 +108,18 @@ class SearchFilters {
     bool? includeSubfolders,
     Set<int>? tagIds,
     TagMatch? tagMatch,
-    bool? hasNote,
-    bool? hasImage,
-    String? domain,
-    bool clearDomain = false,
+    Tri? hasNote,
+    Tri? hasPreview,
+    Set<String>? domains,
     DatePreset? datePreset,
     DateTime? from,
     DateTime? to,
+    bool clearRange = false,
     LinkSort? sort,
+    bool? unsorted,
+    bool? untagged,
+    bool? unopened,
+    bool? favorites,
   }) {
     return SearchFilters(
       folderId: clearFolder ? null : (folderId ?? this.folderId),
@@ -80,12 +127,16 @@ class SearchFilters {
       tagIds: tagIds ?? this.tagIds,
       tagMatch: tagMatch ?? this.tagMatch,
       hasNote: hasNote ?? this.hasNote,
-      hasImage: hasImage ?? this.hasImage,
-      domain: clearDomain ? null : (domain ?? this.domain),
+      hasPreview: hasPreview ?? this.hasPreview,
+      domains: domains ?? this.domains,
       datePreset: datePreset ?? this.datePreset,
-      from: from ?? this.from,
-      to: to ?? this.to,
+      from: clearRange ? null : (from ?? this.from),
+      to: clearRange ? null : (to ?? this.to),
       sort: sort ?? this.sort,
+      unsorted: unsorted ?? this.unsorted,
+      untagged: untagged ?? this.untagged,
+      unopened: unopened ?? this.unopened,
+      favorites: favorites ?? this.favorites,
     );
   }
 }
@@ -176,12 +227,38 @@ class SearchRepository {
       );
       vars.addAll(ids.map((int id) => Variable<int>(id)));
     }
-    if (filters.hasNote) where.add("trim(l.note) != ''");
-    if (filters.hasImage) where.add('l.image_url IS NOT NULL');
-    if (filters.domain != null) {
-      where.add('l.url LIKE ?');
-      vars.add(Variable<String>('%${filters.domain}%'));
+    switch (filters.hasNote) {
+      case Tri.any:
+        break;
+      case Tri.yes:
+        where.add("trim(l.note) != ''");
+      case Tri.no:
+        where.add("trim(l.note) = ''");
     }
+    switch (filters.hasPreview) {
+      case Tri.any:
+        break;
+      case Tri.yes:
+        where.add('l.image_url IS NOT NULL');
+      case Tri.no:
+        where.add('l.image_url IS NULL');
+    }
+    if (filters.domains.isNotEmpty) {
+      where.add(
+        '(${List<String>.filled(filters.domains.length, 'l.url LIKE ?').join(' OR ')})',
+      );
+      vars.addAll(
+        filters.domains.map((String d) => Variable<String>('%$d%')),
+      );
+    }
+
+    // B5 — the quick chips, as plain predicates.
+    if (filters.unsorted) where.add('l.folder_id IS NULL');
+    if (filters.untagged) {
+      where.add('l.id NOT IN (SELECT link_id FROM link_tags)');
+    }
+    if (filters.unopened) where.add('l.opened_at IS NULL');
+    if (filters.favorites) where.add('l.is_favorite = 1');
 
     final (DateTime?, DateTime?) range = _range(filters);
     if (range.$1 != null) {
@@ -218,7 +295,9 @@ class SearchRepository {
     LinkSort.newest => 'l.created_at DESC',
     LinkSort.oldest => 'l.created_at ASC',
     LinkSort.titleAsc => 'lower(l.title) ASC',
+    LinkSort.domain => 'lower(l.url) ASC',
     LinkSort.recentlyOpened => 'l.opened_at DESC',
+    LinkSort.mostOpened => 'l.open_count DESC',
   };
 
   static (DateTime?, DateTime?) _range(SearchFilters f) {

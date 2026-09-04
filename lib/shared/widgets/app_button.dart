@@ -1,11 +1,10 @@
-import 'dart:ui' show PathMetric;
-
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/palette.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/theme/typography.dart';
+import 'dashed_border.dart';
 
 /// Board 1j — every Save / Next / Cancel in the app is one of these.
 enum AppButtonType {
@@ -108,7 +107,7 @@ class AppButton extends StatelessWidget {
     // it rather than around its label.
     if (dashed) {
       button = CustomPaint(
-        foregroundPainter: _DashedPainter(skin.border!),
+        foregroundPainter: DashedBorderPainter(skin.border!),
         child: button,
       );
     }
@@ -156,36 +155,4 @@ class _ButtonSkin {
   final Color bg;
   final Color fg;
   final Color? border;
-}
-
-/// A dashed stadium outline.
-class _DashedPainter extends CustomPainter {
-  const _DashedPainter(this.color);
-
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final Paint paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1;
-    final Path path = Path()
-      ..addRRect(
-        RRect.fromRectAndRadius(
-          Offset.zero & size,
-          Radius.circular(size.height / 2),
-        ),
-      );
-    for (final PathMetric metric in path.computeMetrics()) {
-      double distance = 0;
-      while (distance < metric.length) {
-        canvas.drawPath(metric.extractPath(distance, distance + 4), paint);
-        distance += 7;
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(_DashedPainter oldDelegate) => oldDelegate.color != color;
 }

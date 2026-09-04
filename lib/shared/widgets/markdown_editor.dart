@@ -5,14 +5,15 @@ import '../../core/theme/palette.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/theme/typography.dart';
 
-/// The note toolbar's controls. Add-link shows four of them; Link detail shows
-/// all seven (board 2d, board 1f).
+/// Board 3b — the note toolbar: bold, italic, bullets, numbered, checkbox.
 enum NoteTool { bold, italic, heading, bullet, numbered, checkbox, link }
 
-const List<NoteTool> kCompactTools = <NoteTool>[
+/// The five the board draws, in order.
+const List<NoteTool> kNoteTools = <NoteTool>[
   NoteTool.bold,
   NoteTool.italic,
   NoteTool.bullet,
+  NoteTool.numbered,
   NoteTool.checkbox,
 ];
 
@@ -21,8 +22,8 @@ const List<NoteTool> kCompactTools = <NoteTool>[
 class MarkdownEditor extends StatelessWidget {
   const MarkdownEditor({
     required this.controller,
-    this.tools = NoteTool.values,
-    this.hint = 'Add a note…',
+    this.tools = kNoteTools,
+    this.hint = 'Markdown supported — headings, lists, checkboxes',
     this.minLines = 3,
     this.maxLines = 12,
     this.focusNode,
@@ -45,24 +46,22 @@ class MarkdownEditor extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(Space.sm),
           decoration: BoxDecoration(
-            color: c.surfaceContainer,
-            borderRadius: BorderRadius.circular(16),
+            color: c.surfaceContainerHigh,
+            borderRadius: BorderRadius.circular(14),
             border: Border.all(color: c.outline),
           ),
           child: Row(
-            spacing: 5,
+            spacing: 6,
             children: <Widget>[
               for (final NoteTool tool in tools)
-                _ToolButton(
-                  tool: tool,
-                  onTap: () => _apply(tool),
-                ),
+                _ToolButton(tool: tool, onTap: () => _apply(tool)),
             ],
           ),
         ),
-        const SizedBox(height: Space.md),
+        const SizedBox(height: Space.sm),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          constraints: const BoxConstraints(minHeight: 78),
           decoration: BoxDecoration(
             color: c.surfaceContainer,
             borderRadius: BorderRadius.circular(16),
@@ -74,13 +73,16 @@ class MarkdownEditor extends StatelessWidget {
             minLines: minLines,
             maxLines: maxLines,
             keyboardType: TextInputType.multiline,
-            style: PerchType.note.copyWith(color: c.onSurface),
+            style: PerchType.note.copyWith(fontSize: 13, color: c.onSurface),
             decoration: InputDecoration(
               isDense: true,
               border: InputBorder.none,
               contentPadding: EdgeInsets.zero,
               hintText: hint,
-              hintStyle: PerchType.note.copyWith(color: c.onSurfaceMuted),
+              hintStyle: PerchType.note.copyWith(
+                fontSize: 13,
+                color: c.onSurfaceMuted,
+              ),
             ),
           ),
         ),
@@ -143,24 +145,42 @@ class _ToolButton extends StatelessWidget {
       label: _label(tool),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(11),
-        child: SizedBox(
-          width: 38,
-          height: 38,
-          child: Icon(_icon(tool), size: 18, color: c.icon),
+        borderRadius: BorderRadius.circular(9),
+        child: Container(
+          width: 32,
+          height: 30,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: c.surfaceContainer,
+            borderRadius: BorderRadius.circular(9),
+            border: Border.all(color: c.outline),
+          ),
+          // The glyph is the mark itself, so nothing has to be learned.
+          child: Text(
+            _glyph(tool),
+            style: PerchType.label
+                .copyWith(
+                  fontSize: 12.5,
+                  color: c.onSurface,
+                  fontStyle: tool == NoteTool.italic
+                      ? FontStyle.italic
+                      : FontStyle.normal,
+                )
+                .weight(tool == NoteTool.bold ? 700 : 500),
+          ),
         ),
       ),
     );
   }
 
-  static IconData _icon(NoteTool tool) => switch (tool) {
-    NoteTool.bold => Icons.format_bold_rounded,
-    NoteTool.italic => Icons.format_italic_rounded,
-    NoteTool.heading => Icons.title_rounded,
-    NoteTool.bullet => Icons.format_list_bulleted_rounded,
-    NoteTool.numbered => Icons.format_list_numbered_rounded,
-    NoteTool.checkbox => Icons.check_box_outlined,
-    NoteTool.link => Icons.link_rounded,
+  static String _glyph(NoteTool tool) => switch (tool) {
+    NoteTool.bold => 'B',
+    NoteTool.italic => 'I',
+    NoteTool.heading => 'H',
+    NoteTool.bullet => '\u2022',
+    NoteTool.numbered => '1.',
+    NoteTool.checkbox => '\u2611',
+    NoteTool.link => '\u{1F517}',
   };
 
   static String _label(NoteTool tool) => switch (tool) {

@@ -30,6 +30,26 @@ final StreamProvider<int> folderCountProvider = StreamProvider<int>((Ref ref) {
       .map((List<QueryRow> rows) => rows.first.read<int>('c'));
 });
 
+/// How many links sit directly at a location — the count in the header line.
+final StreamProviderFamily<int, int?> folderLinkCountProvider =
+    StreamProvider.family<int, int?>((Ref ref, int? folderId) {
+      final PerchDatabase db = ref.watch(databaseProvider);
+      return db
+          .customSelect(
+            folderId == null
+                ? 'SELECT COUNT(*) AS c FROM links WHERE folder_id IS NULL'
+                : 'SELECT COUNT(*) AS c FROM links WHERE folder_id = ?1',
+            variables: folderId == null
+                ? const <Variable<Object>>[]
+                : <Variable<Object>>[Variable<int>(folderId)],
+            readsFrom: <ResultSetImplementation<HasResultSet, dynamic>>{
+              db.links,
+            },
+          )
+          .watch()
+          .map((List<QueryRow> rows) => rows.first.read<int>('c'));
+    });
+
 /// Every folder, flat. Folders are few, so one watch feeds the picker, the
 /// path map and the stats screen.
 final StreamProvider<List<Folder>> allFoldersProvider =

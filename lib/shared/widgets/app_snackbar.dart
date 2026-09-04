@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:collection';
 
 import 'package:flutter/material.dart';
 
@@ -8,7 +7,7 @@ import '../../core/theme/palette.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/theme/typography.dart';
 
-enum SnackVariant { info, success, warning, error }
+export '../../core/theme/palette.dart' show SnackVariant;
 
 /// Which edge the strip is anchored to. The anchor decides which way a vertical
 /// swipe dismisses it.
@@ -19,7 +18,7 @@ class SnackMessage {
     required this.text,
     this.variant = SnackVariant.info,
     this.position = SnackPosition.bottom,
-    this.duration = const Duration(seconds: 4),
+    this.duration,
     this.actionLabel,
     this.onAction,
   });
@@ -27,23 +26,44 @@ class SnackMessage {
   final String text;
   final SnackVariant variant;
   final SnackPosition position;
-  final Duration duration;
+
+  /// Null takes the board's default: 4s, or 7s when an action is offered.
+  final Duration? duration;
   final String? actionLabel;
   final VoidCallback? onAction;
+
+  Duration get resolvedDuration =>
+      duration ?? (actionLabel == null ? _kPlain : _kWithAction);
+
+  static const Duration _kPlain = Duration(seconds: 4);
+  static const Duration _kWithAction = Duration(seconds: 7);
 }
 
-/// Board 1e — the undo strip. An inverse-surface bar with a round status mark,
-/// one line, and an optional action. There is no dialog anywhere in this flow.
+/// One queued message plus the identity the layer animates against.
+class _Entry {
+  _Entry(this.message) : id = ++_seq;
+
+  static int _seq = 0;
+
+  final SnackMessage message;
+  final int id;
+}
+
+/// Board 3h — one spec, four theme-role variants, three themes.
 ///
-/// Flutter's own snackbar cannot be anchored to the top or dismissed by a
-/// directional swipe, and both are in the spec.
+/// Flutter's own snackbar cannot be anchored to the top, dismissed by a
+/// directional swipe, or stacked, and all three are in the spec.
 abstract final class AppSnackbar {
-  static final Queue<SnackMessage> _queue = Queue<SnackMessage>();
-  static OverlayEntry? _entry;
-  static OverlayState? _overlay;
+  /// Newest last. At most [_maxVisible] per anchor are on screen; a further
+  /// message collapses the oldest rather than waiting behind it.
+  static const int _maxVisible = 2;
+
+  static final ValueNotifier<List<_Entry>> _entries =
+      ValueNotifier<List<_Entry>>(const <_Entry>[]);
+  static OverlayEntry? _layer;
 
   static void show(BuildContext context, SnackMessage message) {
-    _queue.add(message);
+    _push(message);
     if (_attach(context)) return;
     // A save can land before the first frame — a share that cold-starts the app
     // does exactly that. The message waits for an overlay rather than throwing.
@@ -52,7 +72,25 @@ abstract final class AppSnackbar {
     });
   }
 
-  /// Finds the overlay to host the strip, and starts it if one exists.
+  static void _push(SnackMessage message) {
+    final List<_Entry> next = <_Entry>[..._entries.value, _Entry(message)];
+    final Iterable<_Entry> sameAnchor = next.where(
+      (_Entry e) => e.message.position == message.position,
+    );
+    if (sameAnchor.length > _maxVisible) {
+      final _Entry oldest = sameAnchor.first;
+      next.remove(oldest);
+    }
+    _entries.value = next;
+  }
+
+  static void _remove(int id) {
+    _entries.value = _entries.value
+        .where((_Entry e) => e.id != id)
+        .toList(growable: false);
+  }
+
+  /// Finds the overlay to host the layer, and inserts it once.
   ///
   /// `Overlay.maybeOf` only looks up the tree, so a context taken from the
   /// router's navigator key — which sits *above* its own overlay — needs the
@@ -62,8 +100,10 @@ abstract final class AppSnackbar {
         Overlay.maybeOf(context, rootOverlay: true) ??
         Navigator.maybeOf(context, rootNavigator: true)?.overlay;
     if (overlay == null || !overlay.mounted) return false;
-    _overlay = overlay;
-    if (_entry == null) _next();
+    if (_layer == null || !_layer!.mounted) {
+      _layer = OverlayEntry(builder: (BuildContext _) => const _SnackLayer());
+      overlay.insert(_layer!);
+    }
     return true;
   }
 
@@ -73,61 +113,122 @@ abstract final class AppSnackbar {
   static void success(BuildContext context, String text) =>
       show(context, SnackMessage(text: text, variant: SnackVariant.success));
 
+  static void warning(BuildContext context, String text) =>
+      show(context, SnackMessage(text: text, variant: SnackVariant.warning));
+
   static void error(BuildContext context, String text) =>
       show(context, SnackMessage(text: text, variant: SnackVariant.error));
 
-  static void _next() {
-    final OverlayState? overlay = _overlay;
-    if (overlay == null || !overlay.mounted || _queue.isEmpty) {
-      _entry = null;
-      return;
-    }
-    final SnackMessage message = _queue.removeFirst();
-    late final OverlayEntry entry;
-    entry = OverlayEntry(
-      builder: (BuildContext context) => _SnackHost(
-        message: message,
-        onDismissed: () {
-          entry.remove();
-          _entry = null;
-          _next();
-        },
-      ),
-    );
-    _entry = entry;
-    overlay.insert(entry);
-  }
-
-  /// Drops anything still queued — used when the screen that raised them goes.
-  static void clear() => _queue.clear();
+  /// Drops everything on screen — used when the screen that raised them goes.
+  static void clear() => _entries.value = const <_Entry>[];
 }
 
-class _SnackHost extends StatefulWidget {
-  const _SnackHost({required this.message, required this.onDismissed});
-
-  final SnackMessage message;
-  final VoidCallback onDismissed;
+/// Renders both anchors. Nothing is painted while the queue is empty, so the
+/// layer costs one `IgnorePointer` when idle.
+class _SnackLayer extends StatelessWidget {
+  const _SnackLayer();
 
   @override
-  State<_SnackHost> createState() => _SnackHostState();
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<List<_Entry>>(
+      valueListenable: AppSnackbar._entries,
+      builder: (BuildContext context, List<_Entry> entries, Widget? _) {
+        if (entries.isEmpty) return const SizedBox.shrink();
+        final MediaQueryData mq = MediaQuery.of(context);
+        List<_Entry> at(SnackPosition p) => entries
+            .where((_Entry e) => e.message.position == p)
+            .toList(growable: false);
+
+        return Stack(
+          children: <Widget>[
+            _Stack(
+              entries: at(SnackPosition.top),
+              position: SnackPosition.top,
+              inset: mq.padding.top + Space.md,
+            ),
+            _Stack(
+              entries: at(SnackPosition.bottom),
+              position: SnackPosition.bottom,
+              // Above the floating nav pill, as the board places it.
+              inset: mq.padding.bottom + 96,
+            ),
+          ],
+        );
+      },
+    );
+  }
 }
 
-class _SnackHostState extends State<_SnackHost>
+class _Stack extends StatelessWidget {
+  const _Stack({
+    required this.entries,
+    required this.position,
+    required this.inset,
+  });
+
+  final List<_Entry> entries;
+  final SnackPosition position;
+  final double inset;
+
+  @override
+  Widget build(BuildContext context) {
+    if (entries.isEmpty) return const SizedBox.shrink();
+    final bool top = position == SnackPosition.top;
+    // Newest reads in front: at the top anchor that is the last row, at the
+    // bottom anchor it is the row nearest the edge.
+    final List<Widget> strips = <Widget>[
+      for (final _Entry e in entries)
+        Padding(
+          key: ValueKey<int>(e.id),
+          padding: const EdgeInsets.only(top: 6),
+          child: _AnimatedStrip(entry: e),
+        ),
+    ];
+
+    return Positioned(
+      left: Space.md,
+      right: Space.md,
+      top: top ? inset : null,
+      bottom: top ? null : inset,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: top ? strips : strips.reversed.toList(growable: false),
+      ),
+    );
+  }
+}
+
+/// Enter, dwell, swipe and exit for one message.
+class _AnimatedStrip extends StatefulWidget {
+  const _AnimatedStrip({required this.entry});
+
+  final _Entry entry;
+
+  @override
+  State<_AnimatedStrip> createState() => _AnimatedStripState();
+}
+
+class _AnimatedStripState extends State<_AnimatedStrip>
     with SingleTickerProviderStateMixin {
   late final AnimationController _enter = AnimationController(
     vsync: this,
-    duration: Motion.fast,
+    duration: Motion.snackEnter,
+    reverseDuration: Motion.snackExit,
   )..forward();
+
   Timer? _timer;
   Offset _drag = Offset.zero;
+  Offset _exitTo = Offset.zero;
   bool _dismissing = false;
 
-  bool get _top => widget.message.position == SnackPosition.top;
+  SnackMessage get _m => widget.entry.message;
+  bool get _top => _m.position == SnackPosition.top;
 
   @override
   void initState() {
     super.initState();
-    _timer = Timer(widget.message.duration, _dismiss);
+    _restartTimer();
   }
 
   @override
@@ -137,17 +238,29 @@ class _SnackHostState extends State<_SnackHost>
     super.dispose();
   }
 
+  /// Reduced motion trades the translate for a longer read.
+  void _restartTimer() {
+    _timer?.cancel();
+    final Duration base = _m.resolvedDuration;
+    final Duration wait = Motion.reduced(context) && _m.duration == null
+        ? const Duration(seconds: 6)
+        : base;
+    _timer = Timer(wait, _dismiss);
+  }
+
   Future<void> _dismiss() async {
     if (_dismissing) return;
     _dismissing = true;
     _timer?.cancel();
     if (mounted) await _enter.reverse();
-    if (mounted) widget.onDismissed();
+    AppSnackbar._remove(widget.entry.id);
   }
+
+  void _onPanStart(DragStartDetails _) => _timer?.cancel();
 
   void _onPanUpdate(DragUpdateDetails d) {
     setState(() {
-      // Horizontal either way; vertical only towards the anchored edge.
+      // Horizontal either way; vertical only away from the anchored edge.
       final double dy = _top
           ? (_drag.dy + d.delta.dy).clamp(-400.0, 0.0)
           : (_drag.dy + d.delta.dy).clamp(0.0, 400.0);
@@ -158,42 +271,40 @@ class _SnackHostState extends State<_SnackHost>
   void _onPanEnd(DragEndDetails d) {
     const double threshold = 64;
     if (_drag.dx.abs() > threshold || _drag.dy.abs() > threshold) {
+      // Exit continues the way the finger was going.
+      _exitTo = Offset(_drag.dx.sign * 360, _drag.dy.sign * 200);
       unawaited(_dismiss());
     } else {
       setState(() => _drag = Offset.zero);
+      _restartTimer();
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final MediaQueryData mq = MediaQuery.of(context);
     final bool reduced = Motion.reduced(context);
-    final double slide = _top ? -24 : 24;
+    final double slide = _top ? -16 : 16;
 
-    return Positioned(
-      left: Space.screen,
-      right: Space.screen,
-      top: _top ? mq.padding.top + Space.md : null,
-      // Sits above the floating nav, as the board places it.
-      bottom: _top ? null : mq.padding.bottom + 96,
-      child: AnimatedBuilder(
-        animation: _enter,
-        builder: (BuildContext context, Widget? child) {
-          final double t = _enter.value;
-          return Opacity(
-            opacity: t.clamp(0, 1),
-            child: Transform.translate(
-              offset:
-                  _drag + (reduced ? Offset.zero : Offset(0, slide * (1 - t))),
-              child: child,
-            ),
-          );
-        },
-        child: GestureDetector(
-          onPanUpdate: _onPanUpdate,
-          onPanEnd: _onPanEnd,
-          child: _Strip(message: widget.message, onClose: _dismiss),
-        ),
+    return AnimatedBuilder(
+      animation: _enter,
+      builder: (BuildContext context, Widget? child) {
+        final double t = _enter.value;
+        final Offset offset = reduced
+            ? _drag
+            : _drag +
+                  (_dismissing && _exitTo != Offset.zero
+                      ? _exitTo * (1 - t)
+                      : Offset(0, slide * (1 - t)));
+        return Opacity(
+          opacity: t.clamp(0, 1),
+          child: Transform.translate(offset: offset, child: child),
+        );
+      },
+      child: GestureDetector(
+        onPanStart: _onPanStart,
+        onPanUpdate: _onPanUpdate,
+        onPanEnd: _onPanEnd,
+        child: _Strip(message: _m, onClose: _dismiss),
       ),
     );
   }
@@ -205,79 +316,93 @@ class _Strip extends StatelessWidget {
   final SnackMessage message;
   final VoidCallback onClose;
 
+  static IconData iconFor(SnackVariant variant) => switch (variant) {
+    SnackVariant.info => Icons.info_outline_rounded,
+    SnackVariant.success => Icons.check_circle_outline_rounded,
+    SnackVariant.warning => Icons.error_outline_rounded,
+    SnackVariant.error => Icons.cancel_outlined,
+  };
+
   @override
   Widget build(BuildContext context) {
     final PerchColors c = context.colors;
-    final (Color markColor, IconData markIcon) = switch (message.variant) {
-      SnackVariant.info => (c.inverseAccent, Icons.info_outline_rounded),
-      SnackVariant.success => (c.primary, Icons.check_rounded),
-      SnackVariant.warning => (c.warning, Icons.priority_high_rounded),
-      SnackVariant.error => (c.danger, Icons.close_rounded),
-    };
+    final SnackColors s = c.snack(message.variant);
 
     return Material(
       color: Colors.transparent,
       child: Semantics(
         liveRegion: true,
         child: Container(
-          constraints: const BoxConstraints(minHeight: 52),
-          padding: const EdgeInsets.symmetric(horizontal: Space.lg),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
           decoration: BoxDecoration(
-            color: c.inverseSurface,
-            borderRadius: BorderRadius.circular(16),
+            color: s.surface,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: s.tint),
             boxShadow: <BoxShadow>[
               BoxShadow(
                 color: c.shadow,
-                blurRadius: 18,
-                offset: const Offset(0, 6),
+                blurRadius: 24,
+                offset: const Offset(0, 8),
               ),
             ],
           ),
           child: Row(
-            spacing: 11,
+            spacing: Space.md,
             children: <Widget>[
-              Container(
-                width: 24,
-                height: 24,
-                decoration: BoxDecoration(
-                  color: markColor,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(markIcon, size: 14, color: c.onPrimary),
+              SizedBox(
+                width: 20,
+                child: Icon(iconFor(message.variant), size: 18, color: s.tint),
               ),
               Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: Space.md),
-                  child: Text(
-                    message.text,
-                    style: PerchType.label.copyWith(
-                      fontSize: 13.5,
-                      color: c.onInverseSurface,
-                    ),
-                  ),
+                child: Text(
+                  message.text,
+                  style: PerchType.label.copyWith(fontSize: 13, color: s.on),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
               if (message.actionLabel != null)
-                GestureDetector(
-                  onTap: () {
-                    message.onAction?.call();
-                    onClose();
-                  },
-                  behavior: HitTestBehavior.opaque,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: Space.sm,
-                      vertical: Space.md,
-                    ),
-                    child: Text(
-                      message.actionLabel!,
-                      style: PerchType.labelStrong.copyWith(
-                        fontSize: 12.5,
-                        color: c.inverseAccent,
+                Semantics(
+                  button: true,
+                  label: message.actionLabel,
+                  child: GestureDetector(
+                    onTap: () {
+                      message.onAction?.call();
+                      onClose();
+                    },
+                    behavior: HitTestBehavior.opaque,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: Space.xs,
+                        vertical: 6,
+                      ),
+                      child: Text(
+                        message.actionLabel!.toUpperCase(),
+                        style: PerchType.labelStrong
+                            .copyWith(color: s.tint, letterSpacing: 0.24)
+                            .weight(700),
                       ),
                     ),
                   ),
                 ),
+              // Always present, per the board — never an implicit-only dismiss.
+              Semantics(
+                button: true,
+                label: 'Dismiss',
+                child: GestureDetector(
+                  onTap: onClose,
+                  behavior: HitTestBehavior.opaque,
+                  child: SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: Icon(
+                      Icons.close_rounded,
+                      size: 16,
+                      color: s.on.withValues(alpha: 0.65),
+                    ),
+                  ),
+                ),
+              ),
             ],
           ),
         ),

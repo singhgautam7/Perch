@@ -55,6 +55,21 @@ class TagRepository {
         .toList(growable: false);
   }
 
+  Future<Tag?> byId(int id) =>
+      (_db.select(_db.tags)..where(($TagsTable t) => t.id.equals(id)))
+          .getSingleOrNull();
+
+  /// Creates a tag with a colour chosen in the picker (board 3c).
+  Future<int> create(String name, {int? colorIndex}) => _db
+      .into(_db.tags)
+      .insert(
+        TagsCompanion.insert(
+          name: name.trim(),
+          color: Value<int?>(colorIndex),
+          createdAt: DateTime.now(),
+        ),
+      );
+
   /// Finds a tag by name or creates it. Names are matched case-insensitively so
   /// "Reading" and "reading" never become two tags.
   Future<int> ensure(String name) async {
@@ -96,6 +111,54 @@ class TagRepository {
           mode: InsertMode.insertOrIgnore,
         );
       });
+    });
+  }
+
+  /// Replaces a link's tags with exactly [tagIds] — the shape the shared tag
+  /// picker returns.
+  Future<void> setForLinkByIds(int linkId, List<int> tagIds) async {
+    await _db.transaction(() async {
+      await (_db.delete(_db.linkTags)
+            ..where(($LinkTagsTable t) => t.linkId.equals(linkId)))
+          .go();
+      await _db.batch((Batch b) {
+        b.insertAll(
+          _db.linkTags,
+          tagIds
+              .toSet()
+              .map((int id) => LinkTagsCompanion.insert(linkId: linkId, tagId: id))
+              .toList(growable: false),
+          mode: InsertMode.insertOrIgnore,
+        );
+      });
+    });
+  }
+
+  /// Adds [tagIds] to every link in [linkIds] without disturbing what they
+  /// already carry — the bulk Tag action in board 3f.
+  Future<void> addToLinks(Iterable<int> linkIds, List<int> tagIds) async {
+    await _db.batch((Batch b) {
+      for (final int linkId in linkIds) {
+        b.insertAll(
+          _db.linkTags,
+          tagIds
+              .map((int id) => LinkTagsCompanion.insert(linkId: linkId, tagId: id))
+              .toList(growable: false),
+          mode: InsertMode.insertOrIgnore,
+        );
+      }
+    });
+  }
+
+  /// Board 3c — moves every link onto [targetId], then removes [id].
+  Future<void> merge(int id, int targetId) async {
+    await _db.transaction(() async {
+      await _db.customStatement(
+        'INSERT OR IGNORE INTO link_tags (link_id, tag_id) '
+        'SELECT link_id, ? FROM link_tags WHERE tag_id = ?',
+        <Object>[targetId, id],
+      );
+      await delete(id);
     });
   }
 

@@ -135,7 +135,7 @@ void main() {
 
     expect(
       (await search.search(
-        filters: const SearchFilters(hasNote: true),
+        filters: const SearchFilters(hasNote: Tri.yes),
       )).single.link.id,
       withNote,
     );
@@ -147,7 +147,7 @@ void main() {
       withNote,
     );
     expect(
-      (await search.search(filters: const SearchFilters(domain: 'b.test'))).length,
+      (await search.search(filters: const SearchFilters(domains: <String>{'b.test'}))).length,
       1,
     );
   });

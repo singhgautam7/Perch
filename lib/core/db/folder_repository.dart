@@ -137,6 +137,17 @@ SELECT id FROM tree
         );
   }
 
+  /// Board 3f — an index into `PerchColors.tagHues`, or null for the accent.
+  Future<void> setColor(int id, int? colorIndex) {
+    return (_db.update(_db.folders)..where(($FoldersTable t) => t.id.equals(id)))
+        .write(
+          FoldersCompanion(
+            color: Value<int?>(colorIndex),
+            updatedAt: Value<DateTime>(DateTime.now()),
+          ),
+        );
+  }
+
   Future<void> rename(int id, String name) {
     return (_db.update(_db.folders)..where(($FoldersTable t) => t.id.equals(id)))
         .write(

@@ -4,76 +4,94 @@ import '../../core/theme/app_theme.dart';
 import '../../core/theme/palette.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/theme/typography.dart';
+import 'dashed_border.dart';
 
-/// Board 1j — one chip, four states.
-enum ChipStyle {
-  /// Neutral fill.
-  plain,
-
-  /// Accent fill, for a chosen value in a sheet.
-  selected,
-
-  /// Accent tint, for an active filter that can be removed.
-  active,
-
-  /// Dashed — "add one".
-  add,
-}
-
+/// The one tag chip, in the two sizes the boards use.
+///
+/// Board 3c: a selected chip is filled with the tag's own colour and carries a
+/// ×; an unselected one is muted with a colour dot. Board 3a: the same chip at
+/// 10.5px inside a link card.
 class TagChip extends StatelessWidget {
   const TagChip({
     required this.label,
-    this.style = ChipStyle.plain,
+    this.color,
+    this.selected = false,
+    this.dot = false,
+    this.compact = false,
+    this.add = false,
     this.onTap,
     this.onRemove,
-    this.compact = false,
     super.key,
   });
 
   final String label;
-  final ChipStyle style;
+
+  /// The tag's resolved colour. Null takes the theme accent.
+  final Color? color;
+
+  /// Filled in [color] rather than muted.
+  final bool selected;
+
+  /// Draws the 8dp colour dot an unselected chip carries in the picker.
+  final bool dot;
+
+  /// The 10.5px, 8dp-radius form used inside a link card.
+  final bool compact;
+
+  /// The dashed `＋ Add tag` affordance.
+  final bool add;
   final VoidCallback? onTap;
 
   /// Draws the trailing ×.
   final VoidCallback? onRemove;
 
-  /// The 10.5px form used inside a link card.
-  final bool compact;
-
   @override
   Widget build(BuildContext context) {
     final PerchColors c = context.colors;
-    final (Color bg, Color fg) = switch (style) {
-      ChipStyle.plain => (c.surfaceContainerHigh, c.onSurfaceVariant),
-      ChipStyle.selected => (c.primary, c.onPrimary),
-      ChipStyle.active => (c.primaryContainer, c.accent),
-      ChipStyle.add => (Colors.transparent, c.onSurfaceVariant),
-    };
-    final BorderRadius shape = BorderRadius.circular(compact ? Radii.chip : 9);
+    final Color fill = color ?? c.primary;
+    final Color fg = selected
+        ? (color == null ? c.onPrimary : (c.isDark ? c.surface : c.onPrimary))
+        : (compact ? c.onSurfaceVariant : c.onSurface);
+    final BorderRadius shape = BorderRadius.circular(
+      compact ? Radii.chip : Radii.full,
+    );
 
-    final Widget chip = Container(
+    Widget chip = Container(
       padding: compact
-          ? const EdgeInsets.symmetric(horizontal: Space.sm, vertical: 3)
-          : const EdgeInsets.symmetric(horizontal: Space.md, vertical: 7),
+          ? const EdgeInsets.symmetric(horizontal: 9, vertical: 3.5)
+          : EdgeInsets.symmetric(horizontal: 13, vertical: selected ? 8 : 7),
       decoration: BoxDecoration(
-        color: bg,
+        color: add
+            ? Colors.transparent
+            : selected
+            ? fill
+            : (compact ? c.surfaceContainerHigh : c.surfaceContainer),
         borderRadius: shape,
-        border: style == ChipStyle.add ? Border.all(color: c.outline) : null,
+        border: selected || add ? null : Border.all(color: c.outline),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
-        spacing: Space.xs,
+        spacing: 7,
         children: <Widget>[
-          if (style == ChipStyle.add)
-            Icon(Icons.add_rounded, size: 14, color: fg),
+          if (add)
+            Icon(Icons.add_rounded, size: 14, color: c.onSurfaceVariant)
+          else if (dot && !selected)
+            Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(color: fill, shape: BoxShape.circle),
+            ),
           Text(
             label,
             style: compact
                 ? PerchType.label.copyWith(fontSize: 10.5, color: fg)
-                : PerchType.label.copyWith(color: fg),
+                : PerchType.label
+                      .copyWith(
+                        fontSize: 12.5,
+                        color: add ? c.onSurfaceVariant : fg,
+                      )
+                      .weight(selected ? 600 : 500),
           ),
-          if (style == ChipStyle.selected)
-            Icon(Icons.check_rounded, size: 13, color: fg),
           if (onRemove != null)
             GestureDetector(
               onTap: onRemove,
@@ -81,11 +99,15 @@ class TagChip extends StatelessWidget {
               child: Semantics(
                 button: true,
                 label: 'Remove $label',
-                // The glyph stays 13px; the target around it does not.
+                // The glyph stays small; the target around it does not.
                 child: SizedBox(
-                  width: 26,
-                  height: 26,
-                  child: Icon(Icons.close_rounded, size: 13, color: fg),
+                  width: 22,
+                  height: 22,
+                  child: Icon(
+                    Icons.close_rounded,
+                    size: compact ? 12 : 14,
+                    color: fg.withValues(alpha: 0.8),
+                  ),
                 ),
               ),
             ),
@@ -93,8 +115,15 @@ class TagChip extends StatelessWidget {
       ),
     );
 
+    if (add) {
+      chip = CustomPaint(
+        foregroundPainter: DashedBorderPainter(c.outline),
+        child: chip,
+      );
+    }
+
     // A chip that can be acted on carries a 48dp row, even though it only
-    // paints 30 (board 1j, TOUCH TARGETS).
+    // paints ~32 (board 1j, TOUCH TARGETS).
     final Widget sized = onTap == null && onRemove == null
         ? chip
         : SizedBox(height: IconSpec.tapTarget, child: Center(child: chip));
@@ -102,6 +131,7 @@ class TagChip extends StatelessWidget {
     if (onTap == null) return sized;
     return Semantics(
       button: true,
+      selected: selected,
       label: label,
       child: InkWell(onTap: onTap, borderRadius: shape, child: sized),
     );

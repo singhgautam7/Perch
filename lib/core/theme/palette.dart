@@ -30,10 +30,15 @@ class PerchColors extends ThemeExtension<PerchColors> {
     required this.warning,
     required this.danger,
     required this.dangerContainer,
+    required this.onDangerContainer,
+    required this.warnContainer,
+    required this.onWarnContainer,
     required this.inverseSurface,
     required this.onInverseSurface,
     required this.inverseAccent,
     required this.shadow,
+    required this.tone,
+    required this.accentHue,
   });
 
   /// Page background.
@@ -83,7 +88,14 @@ class PerchColors extends ThemeExtension<PerchColors> {
   final Color success;
   final Color warning;
   final Color danger;
+
+  /// The tinted well behind a destructive row (board 3c).
   final Color dangerContainer;
+  final Color onDangerContainer;
+
+  /// Board 3b — the duplicate banner, and the snackbar's warning variant.
+  final Color warnContainer;
+  final Color onWarnContainer;
 
   /// The undo strip and anything else that has to sit above the page rather
   /// than in it — dark in a light theme, light in a dark one.
@@ -95,6 +107,123 @@ class PerchColors extends ThemeExtension<PerchColors> {
 
   /// Only the nav pill and the FAB cast one.
   final Color shadow;
+
+  /// Which variant this map is — the snack, tag and folder roles below are
+  /// derived rather than stored, and they need to know.
+  final Tone tone;
+
+  /// The family's accent hue, so a derived role stays in the same family.
+  final double accentHue;
+
+  bool get isDark => tone != Tone.light;
+
+  /// Board 3c — seven fixed tag hues off the accent wheel. A tag stores its
+  /// index, not an ARGB value, so it re-derives per theme and stays legible in
+  /// light, dark and AMOLED.
+  static const List<double> tagHues = <double>[
+    265, 200, 150, 55, 25, 340, 300,
+  ];
+
+  /// `tags.color` / `folders.color` hold an index into [tagHues]; null takes
+  /// the theme accent.
+  Color tagColor(int? index) {
+    if (index == null) return primary;
+    final double hue = tagHues[index.abs() % tagHues.length];
+    return isDark
+        ? Oklch(0.74, 0.13, hue).toColor()
+        : Oklch(0.55, 0.14, hue).toColor();
+  }
+
+  /// Text that sits on a filled [tagColor] chip.
+  Color onTagColor(int? index) =>
+      isDark ? const Oklch(0.16, 0.01, 0).toColor() : onPrimary;
+
+  /// Board 3f — a folder's own accent triple, replacing the app accent while
+  /// you are inside that folder.
+  FolderTint folderTint(int? index) {
+    if (index == null) {
+      return FolderTint(
+        accent: primary,
+        container: primaryContainer,
+        onContainer: onPrimaryContainer,
+        headerTint: primaryContainer,
+      );
+    }
+    final double hue = tagHues[index.abs() % tagHues.length];
+    return switch (tone) {
+      Tone.light => FolderTint(
+        accent: Oklch(0.58, 0.15, hue).toColor(),
+        container: Oklch(0.92, 0.05, hue).toColor(),
+        onContainer: Oklch(0.42, 0.14, hue).toColor(),
+        headerTint: Oklch(0.955, 0.03, hue).toColor(),
+      ),
+      Tone.dark || Tone.amoled => FolderTint(
+        accent: Oklch(0.74, 0.13, hue).toColor(),
+        container: Oklch(0.30, 0.05, hue).toColor(),
+        onContainer: Oklch(0.90, 0.05, hue).toColor(),
+        headerTint: Oklch(tone == Tone.amoled ? 0.16 : 0.24, 0.03, hue)
+            .toColor(),
+      ),
+    };
+  }
+
+  /// Board 3h — three roles per variant, so no snackbar names a raw colour.
+  SnackColors snack(SnackVariant variant) {
+    final double hue = switch (variant) {
+      SnackVariant.info => accentHue,
+      SnackVariant.success => 150,
+      SnackVariant.warning => 75,
+      SnackVariant.error => 25,
+    };
+    return switch (tone) {
+      Tone.light => switch (variant) {
+        SnackVariant.info => SnackColors(
+          surface: Oklch(0.97, 0.004, hue).toColor(),
+          tint: Oklch(0.72, 0.09, hue).toColor(),
+          on: Oklch(0.22, 0.02, hue).toColor(),
+        ),
+        SnackVariant.success => SnackColors(
+          surface: Oklch(0.96, 0.02, hue).toColor(),
+          tint: Oklch(0.62, 0.13, hue).toColor(),
+          on: Oklch(0.30, 0.07, hue).toColor(),
+        ),
+        SnackVariant.warning => SnackColors(
+          surface: Oklch(0.97, 0.03, hue + 10).toColor(),
+          tint: Oklch(0.70, 0.13, hue).toColor(),
+          on: Oklch(0.34, 0.07, hue - 5).toColor(),
+        ),
+        SnackVariant.error => SnackColors(
+          surface: Oklch(0.97, 0.02, hue).toColor(),
+          tint: Oklch(0.60, 0.17, hue).toColor(),
+          on: Oklch(0.34, 0.10, hue).toColor(),
+        ),
+      },
+      // Dark and AMOLED share the tint and the text; only the well differs, and
+      // on true black it flattens to one near-black for every variant.
+      Tone.dark || Tone.amoled => SnackColors(
+        surface: tone == Tone.amoled
+            ? const Oklch(0.15, 0.014, 265).toColor()
+            : switch (variant) {
+                SnackVariant.info => Oklch(0.18, 0.014, hue).toColor(),
+                SnackVariant.success => Oklch(0.19, 0.03, hue).toColor(),
+                SnackVariant.warning => Oklch(0.21, 0.04, hue).toColor(),
+                SnackVariant.error => Oklch(0.21, 0.05, hue).toColor(),
+              },
+        tint: switch (variant) {
+          SnackVariant.info => Oklch(0.62, 0.14, hue).toColor(),
+          SnackVariant.success => Oklch(0.70, 0.13, hue).toColor(),
+          SnackVariant.warning => Oklch(0.78, 0.14, hue).toColor(),
+          SnackVariant.error => Oklch(0.72, 0.17, hue).toColor(),
+        },
+        on: switch (variant) {
+          SnackVariant.info => Oklch(0.93, 0.006, hue).toColor(),
+          SnackVariant.success => Oklch(0.93, 0.03, hue).toColor(),
+          SnackVariant.warning => Oklch(0.93, 0.04, hue + 10).toColor(),
+          SnackVariant.error => Oklch(0.93, 0.04, hue).toColor(),
+        },
+      ),
+    };
+  }
 
   @override
   PerchColors copyWith({
@@ -118,10 +247,15 @@ class PerchColors extends ThemeExtension<PerchColors> {
     Color? warning,
     Color? danger,
     Color? dangerContainer,
+    Color? onDangerContainer,
+    Color? warnContainer,
+    Color? onWarnContainer,
     Color? inverseSurface,
     Color? onInverseSurface,
     Color? inverseAccent,
     Color? shadow,
+    Tone? tone,
+    double? accentHue,
   }) {
     return PerchColors(
       surface: surface ?? this.surface,
@@ -144,10 +278,15 @@ class PerchColors extends ThemeExtension<PerchColors> {
       warning: warning ?? this.warning,
       danger: danger ?? this.danger,
       dangerContainer: dangerContainer ?? this.dangerContainer,
+      onDangerContainer: onDangerContainer ?? this.onDangerContainer,
+      warnContainer: warnContainer ?? this.warnContainer,
+      onWarnContainer: onWarnContainer ?? this.onWarnContainer,
       inverseSurface: inverseSurface ?? this.inverseSurface,
       onInverseSurface: onInverseSurface ?? this.onInverseSurface,
       inverseAccent: inverseAccent ?? this.inverseAccent,
       shadow: shadow ?? this.shadow,
+      tone: tone ?? this.tone,
+      accentHue: accentHue ?? this.accentHue,
     );
   }
 
@@ -179,12 +318,50 @@ class PerchColors extends ThemeExtension<PerchColors> {
       warning: l(warning, other.warning),
       danger: l(danger, other.danger),
       dangerContainer: l(dangerContainer, other.dangerContainer),
+      onDangerContainer: l(onDangerContainer, other.onDangerContainer),
+      warnContainer: l(warnContainer, other.warnContainer),
+      onWarnContainer: l(onWarnContainer, other.onWarnContainer),
       inverseSurface: l(inverseSurface, other.inverseSurface),
       onInverseSurface: l(onInverseSurface, other.onInverseSurface),
       inverseAccent: l(inverseAccent, other.inverseAccent),
       shadow: l(shadow, other.shadow),
+      tone: t < 0.5 ? tone : other.tone,
+      accentHue: t < 0.5 ? accentHue : other.accentHue,
     );
   }
+}
+
+/// Board 3h — the four snackbar roles. Also the duplicate banner's role in 3b.
+enum SnackVariant { info, success, warning, error }
+
+/// One snackbar's three derived roles.
+@immutable
+class SnackColors {
+  const SnackColors({
+    required this.surface,
+    required this.tint,
+    required this.on,
+  });
+
+  final Color surface;
+  final Color tint;
+  final Color on;
+}
+
+/// Board 3f — a folder's accent triple, plus the wash behind its header.
+@immutable
+class FolderTint {
+  const FolderTint({
+    required this.accent,
+    required this.container,
+    required this.onContainer,
+    required this.headerTint,
+  });
+
+  final Color accent;
+  final Color container;
+  final Color onContainer;
+  final Color headerTint;
 }
 
 /// How dark a variant is. AMOLED is not a mode — it is a true-black toggle that
@@ -328,11 +505,16 @@ class ThemeFamily {
       success: const Oklch(0.55, 0.10, 145).toColor(),
       warning: const Oklch(0.66, 0.13, 62).toColor(),
       danger: const Oklch(0.55, 0.16, 25).toColor(),
-      dangerContainer: const Oklch(0.86, 0.05, 25).toColor(),
+      dangerContainer: const Oklch(0.97, 0.02, 25).toColor(),
+      onDangerContainer: const Oklch(0.48, 0.17, 25).toColor(),
+      warnContainer: const Oklch(0.96, 0.045, 85).toColor(),
+      onWarnContainer: const Oklch(0.40, 0.08, 70).toColor(),
       inverseSurface: _n(0.22, 0.02).toColor(),
       onInverseSurface: _n(0.97, 0.004).toColor(),
       inverseAccent: _p(0.82, pc * 0.63).toColor(),
       shadow: const Oklch(0.35, 0.06, 265, 0.09).toColor(),
+      tone: Tone.light,
+      accentHue: primaryHue,
     );
   }
 
@@ -364,11 +546,16 @@ class ThemeFamily {
       success: const Oklch(0.72, 0.11, 145).toColor(),
       warning: const Oklch(0.78, 0.12, 62).toColor(),
       danger: const Oklch(0.72, 0.14, 25).toColor(),
-      dangerContainer: const Oklch(0.40, 0.08, 25).toColor(),
+      dangerContainer: Oklch(amoled ? 0.20 : 0.26, 0.05, 25).toColor(),
+      onDangerContainer: const Oklch(0.82, 0.11, 25).toColor(),
+      warnContainer: Oklch(amoled ? 0.20 : 0.26, 0.05, 75).toColor(),
+      onWarnContainer: const Oklch(0.90, 0.06, 80).toColor(),
       inverseSurface: _n(0.93, 0.008).toColor(),
       onInverseSurface: _n(0.20, 0.02).toColor(),
       inverseAccent: _p(0.42, pcd).toColor(),
       shadow: const Oklch(0, 0, 0, 0.5).toColor(),
+      tone: amoled ? Tone.amoled : Tone.dark,
+      accentHue: primaryHue,
     );
   }
 }

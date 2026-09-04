@@ -3,72 +3,56 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/db/database.dart';
 import '../../core/providers.dart';
-import '../../core/theme/app_theme.dart';
-import '../../core/theme/palette.dart';
 import '../../core/theme/tokens.dart';
-import '../../core/theme/typography.dart';
 import '../../shared/widgets/app_bottom_sheet.dart';
 import '../../shared/widgets/app_button.dart';
+import '../../shared/widgets/app_menu.dart';
 import '../../shared/widgets/app_snackbar.dart';
+import '../../shared/widgets/labelled_field.dart';
 import 'folder_picker.dart';
 
-/// Long-press on a folder: rename, move, delete.
-Future<void> showFolderActions(
+/// Board 3i — the folder menu: rename, recolour, move, delete.
+enum FolderAction { rename, color, move, delete }
+
+Future<void> showFolderMenu(
   BuildContext context,
   WidgetRef ref,
-  Folder folder,
-) {
-  return showAppBottomSheet<void>(
+  Folder folder, {
+  Offset? at,
+  BuildContext? anchorContext,
+}) async {
+  final FolderAction? action = await showAppMenu<FolderAction>(
     context: context,
-    title: folder.name,
-    builder: (BuildContext sheetContext) => Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: <Widget>[
-        _Action(
-          icon: Icons.edit_outlined,
-          label: 'Rename',
-          onTap: () async {
-            Navigator.of(sheetContext).pop();
-            await _rename(context, ref, folder);
-          },
-        ),
-        _Action(
-          icon: Icons.drive_file_move_outline,
-          label: 'Move',
-          onTap: () async {
-            Navigator.of(sheetContext).pop();
-            final FolderChoice? choice = await showFolderPicker(
-              context,
-              excludeSubtreeOf: folder.id,
-            );
-            if (choice == null || !context.mounted) return;
-            final bool ok = await ref
-                .read(folderRepositoryProvider)
-                .move(folder.id, choice.folderId);
-            if (!context.mounted) return;
-            if (ok) {
-              AppSnackbar.success(context, 'Moved to ${choice.name}');
-            } else {
-              AppSnackbar.error(
-                context,
-                'A folder cannot be moved inside itself',
-              );
-            }
-          },
-        ),
-        _Action(
-          icon: Icons.delete_outline_rounded,
-          label: 'Delete',
-          danger: true,
-          onTap: () async {
-            Navigator.of(sheetContext).pop();
-            await _confirmDelete(context, ref, folder);
-          },
-        ),
-      ],
-    ),
+    globalPosition: at,
+    anchorContext: anchorContext,
+    minWidth: 214,
+    entries: const <AppMenuEntry<FolderAction>>[
+      AppMenuEntry<FolderAction>(value: FolderAction.rename, label: 'Rename'),
+      AppMenuEntry<FolderAction>(
+        value: FolderAction.color,
+        label: 'Change colour',
+      ),
+      AppMenuEntry<FolderAction>(value: FolderAction.move, label: 'Move'),
+      AppMenuEntry<FolderAction>.divider(),
+      AppMenuEntry<FolderAction>(
+        value: FolderAction.delete,
+        label: 'Delete folder',
+        danger: true,
+      ),
+    ],
   );
+  if (action == null || !context.mounted) return;
+
+  switch (action) {
+    case FolderAction.rename:
+      await _rename(context, ref, folder);
+    case FolderAction.color:
+      await _recolor(context, ref, folder);
+    case FolderAction.move:
+      await _move(context, ref, folder);
+    case FolderAction.delete:
+      await _confirmDelete(context, ref, folder);
+  }
 }
 
 Future<void> _rename(
@@ -82,13 +66,28 @@ Future<void> _rename(
   final String? name = await showAppBottomSheet<String>(
     context: context,
     title: 'Rename folder',
-    builder: (BuildContext sheetContext) => TextField(
-      controller: controller,
-      autofocus: true,
-      textInputAction: TextInputAction.done,
-      onSubmitted: (String v) => Navigator.of(sheetContext).pop(v),
-      style: PerchType.body.copyWith(color: sheetContext.colors.onSurface),
-      decoration: const InputDecoration(hintText: 'Folder name'),
+    builder: (BuildContext sheetContext) => Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        LabelledField(
+          label: 'Name',
+          focused: true,
+          child: PlainTextField(
+            controller: controller,
+            autofocus: true,
+            hint: 'Folder name',
+            onSubmitted: (String v) => Navigator.of(sheetContext).pop(v),
+          ),
+        ),
+        const SizedBox(height: Space.lg),
+        AppButton(
+          label: 'Save',
+          fullWidth: true,
+          onPressed: () =>
+              Navigator.of(sheetContext).pop(controller.text.trim()),
+        ),
+      ],
     ),
   );
   controller.dispose();
@@ -96,6 +95,51 @@ Future<void> _rename(
   final String trimmed = name?.trim() ?? '';
   if (trimmed.isEmpty || trimmed == folder.name) return;
   await ref.read(folderRepositoryProvider).rename(folder.id, trimmed);
+}
+
+Future<void> _recolor(
+  BuildContext context,
+  WidgetRef ref,
+  Folder folder,
+) async {
+  await showAppBottomSheet<void>(
+    context: context,
+    title: 'Folder colour',
+    description: 'Perch tints the header, the nav and the ＋ button while you '
+        'are inside this folder.',
+    builder: (BuildContext sheetContext) => StatefulBuilder(
+      builder: (BuildContext context, void Function(void Function()) setState) {
+        return Padding(
+          padding: const EdgeInsets.only(bottom: Space.sm),
+          child: ColorSwatchRow(
+            selected: folder.color,
+            onChanged: (int? index) {
+              ref.read(folderRepositoryProvider).setColor(folder.id, index);
+              Navigator.of(sheetContext).pop();
+            },
+            size: 34,
+          ),
+        );
+      },
+    ),
+  );
+}
+
+Future<void> _move(BuildContext context, WidgetRef ref, Folder folder) async {
+  final FolderChoice? choice = await showFolderPicker(
+    context,
+    excludeSubtreeOf: folder.id,
+  );
+  if (choice == null || !context.mounted) return;
+  final bool ok = await ref
+      .read(folderRepositoryProvider)
+      .move(folder.id, choice.folderId);
+  if (!context.mounted) return;
+  if (ok) {
+    AppSnackbar.success(context, 'Moved to ${choice.name}');
+  } else {
+    AppSnackbar.error(context, 'A folder cannot be moved inside itself');
+  }
 }
 
 Future<void> _confirmDelete(
@@ -106,18 +150,13 @@ Future<void> _confirmDelete(
   final bool? confirmed = await showAppBottomSheet<bool>(
     context: context,
     title: 'Delete ${folder.name}?',
+    description:
+        'The folder and anything nested inside it go. Links stay — they move '
+        'to Unsorted.',
     builder: (BuildContext sheetContext) => Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        Text(
-          'The folder and anything nested inside it go. Links stay — they move '
-          'to Unsorted.',
-          style: PerchType.body.copyWith(
-            color: sheetContext.colors.onSurfaceVariant,
-          ),
-        ),
-        const SizedBox(height: Space.xl),
         AppButton(
           label: 'Delete folder',
           type: AppButtonType.danger,
@@ -137,41 +176,5 @@ Future<void> _confirmDelete(
 
   if (confirmed != true) return;
   await ref.read(folderRepositoryProvider).delete(folder.id);
-  if (context.mounted) {
-    AppSnackbar.info(context, 'Deleted ${folder.name}');
-  }
-}
-
-class _Action extends StatelessWidget {
-  const _Action({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-    this.danger = false,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-  final bool danger;
-
-  @override
-  Widget build(BuildContext context) {
-    final PerchColors c = context.colors;
-    final Color fg = danger ? c.danger : c.onSurface;
-    return InkWell(
-      onTap: onTap,
-      borderRadius: Radii.thumbR,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        child: Row(
-          spacing: 13,
-          children: <Widget>[
-            Icon(icon, size: 20, color: fg),
-            Text(label, style: PerchType.titleMedium.copyWith(color: fg)),
-          ],
-        ),
-      ),
-    );
-  }
+  if (context.mounted) AppSnackbar.info(context, 'Deleted ${folder.name}');
 }

@@ -368,6 +368,15 @@ class $FoldersTable extends Folders with TableInfo<$FoldersTable, Folder> {
     requiredDuringInsert: false,
     defaultValue: const Constant(0),
   );
+  static const VerificationMeta _colorMeta = const VerificationMeta('color');
+  @override
+  late final GeneratedColumn<int> color = GeneratedColumn<int>(
+    'color',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -396,6 +405,7 @@ class $FoldersTable extends Folders with TableInfo<$FoldersTable, Folder> {
     name,
     parentId,
     sortIndex,
+    color,
     createdAt,
     updatedAt,
   ];
@@ -432,6 +442,12 @@ class $FoldersTable extends Folders with TableInfo<$FoldersTable, Folder> {
       context.handle(
         _sortIndexMeta,
         sortIndex.isAcceptableOrUnknown(data['sort_index']!, _sortIndexMeta),
+      );
+    }
+    if (data.containsKey('color')) {
+      context.handle(
+        _colorMeta,
+        color.isAcceptableOrUnknown(data['color']!, _colorMeta),
       );
     }
     if (data.containsKey('created_at')) {
@@ -475,6 +491,10 @@ class $FoldersTable extends Folders with TableInfo<$FoldersTable, Folder> {
         DriftSqlType.int,
         data['${effectivePrefix}sort_index'],
       )!,
+      color: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}color'],
+      ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -499,6 +519,11 @@ class Folder extends DataClass implements Insertable<Folder> {
   /// Null → this folder sits at the root.
   final int? parentId;
   final int sortIndex;
+
+  /// Board 3f — an index into `PerchColors.tagHues`, or null for the theme
+  /// accent. Stored as an index rather than an ARGB value so a folder stays
+  /// legible when the theme changes.
+  final int? color;
   final DateTime createdAt;
   final DateTime updatedAt;
   const Folder({
@@ -506,6 +531,7 @@ class Folder extends DataClass implements Insertable<Folder> {
     required this.name,
     this.parentId,
     required this.sortIndex,
+    this.color,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -518,6 +544,9 @@ class Folder extends DataClass implements Insertable<Folder> {
       map['parent_id'] = Variable<int>(parentId);
     }
     map['sort_index'] = Variable<int>(sortIndex);
+    if (!nullToAbsent || color != null) {
+      map['color'] = Variable<int>(color);
+    }
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
@@ -531,6 +560,9 @@ class Folder extends DataClass implements Insertable<Folder> {
           ? const Value.absent()
           : Value(parentId),
       sortIndex: Value(sortIndex),
+      color: color == null && nullToAbsent
+          ? const Value.absent()
+          : Value(color),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
     );
@@ -546,6 +578,7 @@ class Folder extends DataClass implements Insertable<Folder> {
       name: serializer.fromJson<String>(json['name']),
       parentId: serializer.fromJson<int?>(json['parentId']),
       sortIndex: serializer.fromJson<int>(json['sortIndex']),
+      color: serializer.fromJson<int?>(json['color']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
@@ -558,6 +591,7 @@ class Folder extends DataClass implements Insertable<Folder> {
       'name': serializer.toJson<String>(name),
       'parentId': serializer.toJson<int?>(parentId),
       'sortIndex': serializer.toJson<int>(sortIndex),
+      'color': serializer.toJson<int?>(color),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
@@ -568,6 +602,7 @@ class Folder extends DataClass implements Insertable<Folder> {
     String? name,
     Value<int?> parentId = const Value.absent(),
     int? sortIndex,
+    Value<int?> color = const Value.absent(),
     DateTime? createdAt,
     DateTime? updatedAt,
   }) => Folder(
@@ -575,6 +610,7 @@ class Folder extends DataClass implements Insertable<Folder> {
     name: name ?? this.name,
     parentId: parentId.present ? parentId.value : this.parentId,
     sortIndex: sortIndex ?? this.sortIndex,
+    color: color.present ? color.value : this.color,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
   );
@@ -584,6 +620,7 @@ class Folder extends DataClass implements Insertable<Folder> {
       name: data.name.present ? data.name.value : this.name,
       parentId: data.parentId.present ? data.parentId.value : this.parentId,
       sortIndex: data.sortIndex.present ? data.sortIndex.value : this.sortIndex,
+      color: data.color.present ? data.color.value : this.color,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
@@ -596,6 +633,7 @@ class Folder extends DataClass implements Insertable<Folder> {
           ..write('name: $name, ')
           ..write('parentId: $parentId, ')
           ..write('sortIndex: $sortIndex, ')
+          ..write('color: $color, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -604,7 +642,7 @@ class Folder extends DataClass implements Insertable<Folder> {
 
   @override
   int get hashCode =>
-      Object.hash(id, name, parentId, sortIndex, createdAt, updatedAt);
+      Object.hash(id, name, parentId, sortIndex, color, createdAt, updatedAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -613,6 +651,7 @@ class Folder extends DataClass implements Insertable<Folder> {
           other.name == this.name &&
           other.parentId == this.parentId &&
           other.sortIndex == this.sortIndex &&
+          other.color == this.color &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
 }
@@ -622,6 +661,7 @@ class FoldersCompanion extends UpdateCompanion<Folder> {
   final Value<String> name;
   final Value<int?> parentId;
   final Value<int> sortIndex;
+  final Value<int?> color;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
   const FoldersCompanion({
@@ -629,6 +669,7 @@ class FoldersCompanion extends UpdateCompanion<Folder> {
     this.name = const Value.absent(),
     this.parentId = const Value.absent(),
     this.sortIndex = const Value.absent(),
+    this.color = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
   });
@@ -637,6 +678,7 @@ class FoldersCompanion extends UpdateCompanion<Folder> {
     required String name,
     this.parentId = const Value.absent(),
     this.sortIndex = const Value.absent(),
+    this.color = const Value.absent(),
     required DateTime createdAt,
     required DateTime updatedAt,
   }) : name = Value(name),
@@ -647,6 +689,7 @@ class FoldersCompanion extends UpdateCompanion<Folder> {
     Expression<String>? name,
     Expression<int>? parentId,
     Expression<int>? sortIndex,
+    Expression<int>? color,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
   }) {
@@ -655,6 +698,7 @@ class FoldersCompanion extends UpdateCompanion<Folder> {
       if (name != null) 'name': name,
       if (parentId != null) 'parent_id': parentId,
       if (sortIndex != null) 'sort_index': sortIndex,
+      if (color != null) 'color': color,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
     });
@@ -665,6 +709,7 @@ class FoldersCompanion extends UpdateCompanion<Folder> {
     Value<String>? name,
     Value<int?>? parentId,
     Value<int>? sortIndex,
+    Value<int?>? color,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
   }) {
@@ -673,6 +718,7 @@ class FoldersCompanion extends UpdateCompanion<Folder> {
       name: name ?? this.name,
       parentId: parentId ?? this.parentId,
       sortIndex: sortIndex ?? this.sortIndex,
+      color: color ?? this.color,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -693,6 +739,9 @@ class FoldersCompanion extends UpdateCompanion<Folder> {
     if (sortIndex.present) {
       map['sort_index'] = Variable<int>(sortIndex.value);
     }
+    if (color.present) {
+      map['color'] = Variable<int>(color.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -709,6 +758,7 @@ class FoldersCompanion extends UpdateCompanion<Folder> {
           ..write('name: $name, ')
           ..write('parentId: $parentId, ')
           ..write('sortIndex: $sortIndex, ')
+          ..write('color: $color, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -822,6 +872,33 @@ class $LinksTable extends Links with TableInfo<$LinksTable, Link> {
     requiredDuringInsert: false,
     defaultValue: const Constant(0),
   );
+  static const VerificationMeta _isFavoriteMeta = const VerificationMeta(
+    'isFavorite',
+  );
+  @override
+  late final GeneratedColumn<bool> isFavorite = GeneratedColumn<bool>(
+    'is_favorite',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_favorite" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _sortIndexMeta = const VerificationMeta(
+    'sortIndex',
+  );
+  @override
+  late final GeneratedColumn<int> sortIndex = GeneratedColumn<int>(
+    'sort_index',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
   static const VerificationMeta _siteNameMeta = const VerificationMeta(
     'siteName',
   );
@@ -898,6 +975,8 @@ class $LinksTable extends Links with TableInfo<$LinksTable, Link> {
     updatedAt,
     openedAt,
     openCount,
+    isFavorite,
+    sortIndex,
     siteName,
     description,
     imageUrl,
@@ -972,6 +1051,18 @@ class $LinksTable extends Links with TableInfo<$LinksTable, Link> {
       context.handle(
         _openCountMeta,
         openCount.isAcceptableOrUnknown(data['open_count']!, _openCountMeta),
+      );
+    }
+    if (data.containsKey('is_favorite')) {
+      context.handle(
+        _isFavoriteMeta,
+        isFavorite.isAcceptableOrUnknown(data['is_favorite']!, _isFavoriteMeta),
+      );
+    }
+    if (data.containsKey('sort_index')) {
+      context.handle(
+        _sortIndexMeta,
+        sortIndex.isAcceptableOrUnknown(data['sort_index']!, _sortIndexMeta),
       );
     }
     if (data.containsKey('site_name')) {
@@ -1052,6 +1143,14 @@ class $LinksTable extends Links with TableInfo<$LinksTable, Link> {
         DriftSqlType.int,
         data['${effectivePrefix}open_count'],
       )!,
+      isFavorite: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_favorite'],
+      )!,
+      sortIndex: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}sort_index'],
+      )!,
       siteName: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}site_name'],
@@ -1106,6 +1205,13 @@ class Link extends DataClass implements Insertable<Link> {
   final DateTime updatedAt;
   final DateTime? openedAt;
   final int openCount;
+
+  /// Board 3f — pinned links gather into their own section above the count row.
+  final bool isFavorite;
+
+  /// Manual ordering. Unused by the current sorts, but written on every save so
+  /// a future drag-to-reorder has a stable field to work with.
+  final int sortIndex;
   final String? siteName;
   final String? description;
   final String? imageUrl;
@@ -1122,6 +1228,8 @@ class Link extends DataClass implements Insertable<Link> {
     required this.updatedAt,
     this.openedAt,
     required this.openCount,
+    required this.isFavorite,
+    required this.sortIndex,
     this.siteName,
     this.description,
     this.imageUrl,
@@ -1145,6 +1253,8 @@ class Link extends DataClass implements Insertable<Link> {
       map['opened_at'] = Variable<DateTime>(openedAt);
     }
     map['open_count'] = Variable<int>(openCount);
+    map['is_favorite'] = Variable<bool>(isFavorite);
+    map['sort_index'] = Variable<int>(sortIndex);
     if (!nullToAbsent || siteName != null) {
       map['site_name'] = Variable<String>(siteName);
     }
@@ -1183,6 +1293,8 @@ class Link extends DataClass implements Insertable<Link> {
           ? const Value.absent()
           : Value(openedAt),
       openCount: Value(openCount),
+      isFavorite: Value(isFavorite),
+      sortIndex: Value(sortIndex),
       siteName: siteName == null && nullToAbsent
           ? const Value.absent()
           : Value(siteName),
@@ -1217,6 +1329,8 @@ class Link extends DataClass implements Insertable<Link> {
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
       openedAt: serializer.fromJson<DateTime?>(json['openedAt']),
       openCount: serializer.fromJson<int>(json['openCount']),
+      isFavorite: serializer.fromJson<bool>(json['isFavorite']),
+      sortIndex: serializer.fromJson<int>(json['sortIndex']),
       siteName: serializer.fromJson<String?>(json['siteName']),
       description: serializer.fromJson<String?>(json['description']),
       imageUrl: serializer.fromJson<String?>(json['imageUrl']),
@@ -1240,6 +1354,8 @@ class Link extends DataClass implements Insertable<Link> {
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
       'openedAt': serializer.toJson<DateTime?>(openedAt),
       'openCount': serializer.toJson<int>(openCount),
+      'isFavorite': serializer.toJson<bool>(isFavorite),
+      'sortIndex': serializer.toJson<int>(sortIndex),
       'siteName': serializer.toJson<String?>(siteName),
       'description': serializer.toJson<String?>(description),
       'imageUrl': serializer.toJson<String?>(imageUrl),
@@ -1261,6 +1377,8 @@ class Link extends DataClass implements Insertable<Link> {
     DateTime? updatedAt,
     Value<DateTime?> openedAt = const Value.absent(),
     int? openCount,
+    bool? isFavorite,
+    int? sortIndex,
     Value<String?> siteName = const Value.absent(),
     Value<String?> description = const Value.absent(),
     Value<String?> imageUrl = const Value.absent(),
@@ -1277,6 +1395,8 @@ class Link extends DataClass implements Insertable<Link> {
     updatedAt: updatedAt ?? this.updatedAt,
     openedAt: openedAt.present ? openedAt.value : this.openedAt,
     openCount: openCount ?? this.openCount,
+    isFavorite: isFavorite ?? this.isFavorite,
+    sortIndex: sortIndex ?? this.sortIndex,
     siteName: siteName.present ? siteName.value : this.siteName,
     description: description.present ? description.value : this.description,
     imageUrl: imageUrl.present ? imageUrl.value : this.imageUrl,
@@ -1295,6 +1415,10 @@ class Link extends DataClass implements Insertable<Link> {
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       openedAt: data.openedAt.present ? data.openedAt.value : this.openedAt,
       openCount: data.openCount.present ? data.openCount.value : this.openCount,
+      isFavorite: data.isFavorite.present
+          ? data.isFavorite.value
+          : this.isFavorite,
+      sortIndex: data.sortIndex.present ? data.sortIndex.value : this.sortIndex,
       siteName: data.siteName.present ? data.siteName.value : this.siteName,
       description: data.description.present
           ? data.description.value
@@ -1322,6 +1446,8 @@ class Link extends DataClass implements Insertable<Link> {
           ..write('updatedAt: $updatedAt, ')
           ..write('openedAt: $openedAt, ')
           ..write('openCount: $openCount, ')
+          ..write('isFavorite: $isFavorite, ')
+          ..write('sortIndex: $sortIndex, ')
           ..write('siteName: $siteName, ')
           ..write('description: $description, ')
           ..write('imageUrl: $imageUrl, ')
@@ -1343,6 +1469,8 @@ class Link extends DataClass implements Insertable<Link> {
     updatedAt,
     openedAt,
     openCount,
+    isFavorite,
+    sortIndex,
     siteName,
     description,
     imageUrl,
@@ -1363,6 +1491,8 @@ class Link extends DataClass implements Insertable<Link> {
           other.updatedAt == this.updatedAt &&
           other.openedAt == this.openedAt &&
           other.openCount == this.openCount &&
+          other.isFavorite == this.isFavorite &&
+          other.sortIndex == this.sortIndex &&
           other.siteName == this.siteName &&
           other.description == this.description &&
           other.imageUrl == this.imageUrl &&
@@ -1381,6 +1511,8 @@ class LinksCompanion extends UpdateCompanion<Link> {
   final Value<DateTime> updatedAt;
   final Value<DateTime?> openedAt;
   final Value<int> openCount;
+  final Value<bool> isFavorite;
+  final Value<int> sortIndex;
   final Value<String?> siteName;
   final Value<String?> description;
   final Value<String?> imageUrl;
@@ -1397,6 +1529,8 @@ class LinksCompanion extends UpdateCompanion<Link> {
     this.updatedAt = const Value.absent(),
     this.openedAt = const Value.absent(),
     this.openCount = const Value.absent(),
+    this.isFavorite = const Value.absent(),
+    this.sortIndex = const Value.absent(),
     this.siteName = const Value.absent(),
     this.description = const Value.absent(),
     this.imageUrl = const Value.absent(),
@@ -1414,6 +1548,8 @@ class LinksCompanion extends UpdateCompanion<Link> {
     required DateTime updatedAt,
     this.openedAt = const Value.absent(),
     this.openCount = const Value.absent(),
+    this.isFavorite = const Value.absent(),
+    this.sortIndex = const Value.absent(),
     this.siteName = const Value.absent(),
     this.description = const Value.absent(),
     this.imageUrl = const Value.absent(),
@@ -1433,6 +1569,8 @@ class LinksCompanion extends UpdateCompanion<Link> {
     Expression<DateTime>? updatedAt,
     Expression<DateTime>? openedAt,
     Expression<int>? openCount,
+    Expression<bool>? isFavorite,
+    Expression<int>? sortIndex,
     Expression<String>? siteName,
     Expression<String>? description,
     Expression<String>? imageUrl,
@@ -1450,6 +1588,8 @@ class LinksCompanion extends UpdateCompanion<Link> {
       if (updatedAt != null) 'updated_at': updatedAt,
       if (openedAt != null) 'opened_at': openedAt,
       if (openCount != null) 'open_count': openCount,
+      if (isFavorite != null) 'is_favorite': isFavorite,
+      if (sortIndex != null) 'sort_index': sortIndex,
       if (siteName != null) 'site_name': siteName,
       if (description != null) 'description': description,
       if (imageUrl != null) 'image_url': imageUrl,
@@ -1469,6 +1609,8 @@ class LinksCompanion extends UpdateCompanion<Link> {
     Value<DateTime>? updatedAt,
     Value<DateTime?>? openedAt,
     Value<int>? openCount,
+    Value<bool>? isFavorite,
+    Value<int>? sortIndex,
     Value<String?>? siteName,
     Value<String?>? description,
     Value<String?>? imageUrl,
@@ -1486,6 +1628,8 @@ class LinksCompanion extends UpdateCompanion<Link> {
       updatedAt: updatedAt ?? this.updatedAt,
       openedAt: openedAt ?? this.openedAt,
       openCount: openCount ?? this.openCount,
+      isFavorite: isFavorite ?? this.isFavorite,
+      sortIndex: sortIndex ?? this.sortIndex,
       siteName: siteName ?? this.siteName,
       description: description ?? this.description,
       imageUrl: imageUrl ?? this.imageUrl,
@@ -1525,6 +1669,12 @@ class LinksCompanion extends UpdateCompanion<Link> {
     if (openCount.present) {
       map['open_count'] = Variable<int>(openCount.value);
     }
+    if (isFavorite.present) {
+      map['is_favorite'] = Variable<bool>(isFavorite.value);
+    }
+    if (sortIndex.present) {
+      map['sort_index'] = Variable<int>(sortIndex.value);
+    }
     if (siteName.present) {
       map['site_name'] = Variable<String>(siteName.value);
     }
@@ -1560,6 +1710,8 @@ class LinksCompanion extends UpdateCompanion<Link> {
           ..write('updatedAt: $updatedAt, ')
           ..write('openedAt: $openedAt, ')
           ..write('openCount: $openCount, ')
+          ..write('isFavorite: $isFavorite, ')
+          ..write('sortIndex: $sortIndex, ')
           ..write('siteName: $siteName, ')
           ..write('description: $description, ')
           ..write('imageUrl: $imageUrl, ')
@@ -1703,7 +1855,7 @@ class Tag extends DataClass implements Insertable<Tag> {
   final int id;
   final String name;
 
-  /// Null → the tag takes the theme accent.
+  /// An index into `PerchColors.tagHues`; null takes the theme accent.
   final int? color;
   final DateTime createdAt;
   const Tag({
@@ -2548,6 +2700,7 @@ typedef $$FoldersTableCreateCompanionBuilder = FoldersCompanion Function({
   required String name,
   Value<int?> parentId,
   Value<int> sortIndex,
+  Value<int?> color,
   required DateTime createdAt,
   required DateTime updatedAt,
 });
@@ -2556,6 +2709,7 @@ typedef $$FoldersTableUpdateCompanionBuilder = FoldersCompanion Function({
   Value<String> name,
   Value<int?> parentId,
   Value<int> sortIndex,
+  Value<int?> color,
   Value<DateTime> createdAt,
   Value<DateTime> updatedAt,
 });
@@ -2622,6 +2776,11 @@ class $$FoldersTableFilterComposer
 
   ColumnFilters<int> get sortIndex => $composableBuilder(
     column: $table.sortIndex,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get color => $composableBuilder(
+    column: $table.color,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -2708,6 +2867,11 @@ class $$FoldersTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get color => $composableBuilder(
+    column: $table.color,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -2759,6 +2923,9 @@ class $$FoldersTableAnnotationComposer
 
   GeneratedColumn<int> get sortIndex =>
       $composableBuilder(column: $table.sortIndex, builder: (column) => column);
+
+  GeneratedColumn<int> get color =>
+      $composableBuilder(column: $table.color, builder: (column) => column);
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -2847,6 +3014,7 @@ class $$FoldersTableTableManager
                 Value<String> name = const Value.absent(),
                 Value<int?> parentId = const Value.absent(),
                 Value<int> sortIndex = const Value.absent(),
+                Value<int?> color = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
               }) => FoldersCompanion(
@@ -2854,6 +3022,7 @@ class $$FoldersTableTableManager
                 name: name,
                 parentId: parentId,
                 sortIndex: sortIndex,
+                color: color,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
               ),
@@ -2863,6 +3032,7 @@ class $$FoldersTableTableManager
                 required String name,
                 Value<int?> parentId = const Value.absent(),
                 Value<int> sortIndex = const Value.absent(),
+                Value<int?> color = const Value.absent(),
                 required DateTime createdAt,
                 required DateTime updatedAt,
               }) => FoldersCompanion.insert(
@@ -2870,6 +3040,7 @@ class $$FoldersTableTableManager
                 name: name,
                 parentId: parentId,
                 sortIndex: sortIndex,
+                color: color,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
               ),
@@ -2961,6 +3132,8 @@ typedef $$LinksTableCreateCompanionBuilder = LinksCompanion Function({
   required DateTime updatedAt,
   Value<DateTime?> openedAt,
   Value<int> openCount,
+  Value<bool> isFavorite,
+  Value<int> sortIndex,
   Value<String?> siteName,
   Value<String?> description,
   Value<String?> imageUrl,
@@ -2978,6 +3151,8 @@ typedef $$LinksTableUpdateCompanionBuilder = LinksCompanion Function({
   Value<DateTime> updatedAt,
   Value<DateTime?> openedAt,
   Value<int> openCount,
+  Value<bool> isFavorite,
+  Value<int> sortIndex,
   Value<String?> siteName,
   Value<String?> description,
   Value<String?> imageUrl,
@@ -3073,6 +3248,16 @@ class $$LinksTableFilterComposer
 
   ColumnFilters<int> get openCount => $composableBuilder(
     column: $table.openCount,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isFavorite => $composableBuilder(
+    column: $table.isFavorite,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get sortIndex => $composableBuilder(
+    column: $table.sortIndex,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -3205,6 +3390,16 @@ class $$LinksTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get isFavorite => $composableBuilder(
+    column: $table.isFavorite,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get sortIndex => $composableBuilder(
+    column: $table.sortIndex,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get siteName => $composableBuilder(
     column: $table.siteName,
     builder: (column) => ColumnOrderings(column),
@@ -3291,6 +3486,14 @@ class $$LinksTableAnnotationComposer
 
   GeneratedColumn<int> get openCount =>
       $composableBuilder(column: $table.openCount, builder: (column) => column);
+
+  GeneratedColumn<bool> get isFavorite => $composableBuilder(
+    column: $table.isFavorite,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get sortIndex =>
+      $composableBuilder(column: $table.sortIndex, builder: (column) => column);
 
   GeneratedColumn<String> get siteName =>
       $composableBuilder(column: $table.siteName, builder: (column) => column);
@@ -3403,6 +3606,8 @@ class $$LinksTableTableManager
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<DateTime?> openedAt = const Value.absent(),
                 Value<int> openCount = const Value.absent(),
+                Value<bool> isFavorite = const Value.absent(),
+                Value<int> sortIndex = const Value.absent(),
                 Value<String?> siteName = const Value.absent(),
                 Value<String?> description = const Value.absent(),
                 Value<String?> imageUrl = const Value.absent(),
@@ -3419,6 +3624,8 @@ class $$LinksTableTableManager
                 updatedAt: updatedAt,
                 openedAt: openedAt,
                 openCount: openCount,
+                isFavorite: isFavorite,
+                sortIndex: sortIndex,
                 siteName: siteName,
                 description: description,
                 imageUrl: imageUrl,
@@ -3437,6 +3644,8 @@ class $$LinksTableTableManager
                 required DateTime updatedAt,
                 Value<DateTime?> openedAt = const Value.absent(),
                 Value<int> openCount = const Value.absent(),
+                Value<bool> isFavorite = const Value.absent(),
+                Value<int> sortIndex = const Value.absent(),
                 Value<String?> siteName = const Value.absent(),
                 Value<String?> description = const Value.absent(),
                 Value<String?> imageUrl = const Value.absent(),
@@ -3453,6 +3662,8 @@ class $$LinksTableTableManager
                 updatedAt: updatedAt,
                 openedAt: openedAt,
                 openCount: openCount,
+                isFavorite: isFavorite,
+                sortIndex: sortIndex,
                 siteName: siteName,
                 description: description,
                 imageUrl: imageUrl,

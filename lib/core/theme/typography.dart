@@ -53,6 +53,22 @@ abstract final class PerchType {
     letterSpacing: -0.6,
   );
 
+  /// Board 3a — the one screen title, Instrument Serif 26, in every header.
+  static const TextStyle headerTitle = TextStyle(
+    fontFamily: serif,
+    fontSize: 26,
+    height: 1.05,
+    fontWeight: FontWeight.w400,
+  );
+
+  /// A sheet's own title, one step down from [headerTitle].
+  static const TextStyle sheetTitle = TextStyle(
+    fontFamily: serif,
+    fontSize: 22,
+    height: 1.1,
+    fontWeight: FontWeight.w400,
+  );
+
   /// Screen title in the top bar.
   static TextStyle get screenTitle =>
       _sans(19, 1.25, 600, letterSpacing: -0.19);

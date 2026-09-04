@@ -18,12 +18,7 @@ class SectionHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final PerchColors c = context.colors;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        Space.screen,
-        6,
-        Space.screen,
-        Space.md,
-      ),
+      padding: const EdgeInsets.fromLTRB(Space.screen, 2, Space.screen, Space.row),
       child: Row(
         children: <Widget>[
           Expanded(

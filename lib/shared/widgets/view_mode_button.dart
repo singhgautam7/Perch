@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
 
 import '../../core/db/settings_repository.dart';
-import '../../core/theme/app_theme.dart';
-import '../../core/theme/palette.dart';
-import '../../core/theme/tokens.dart';
+import 'app_icon_button.dart';
+import 'app_menu.dart';
 
-/// The top-bar control that shows — and changes — how links are drawn.
+/// Board 3a — the view switcher is a menu anchored to the icon-button, with a
+/// radio item per mode and the current one checked.
 ///
 /// The glyph is the mode itself: three bars for Large, two for Minimal, a 2×2
-/// for Grid. Tapping moves to the next mode.
+/// for Grid. The selection is one app-wide preference, so it applies to the
+/// links inside a folder too.
 class ViewModeButton extends StatelessWidget {
   const ViewModeButton({
     required this.mode,
@@ -21,31 +22,27 @@ class ViewModeButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final PerchColors c = context.colors;
-    final LinkViewMode next = LinkViewMode
-        .values[(mode.index + 1) % LinkViewMode.values.length];
-
-    return Semantics(
-      button: true,
-      label: '${mode.label} view. Switch to ${next.label}',
-      child: SizedBox(
-        width: IconSpec.tapTarget,
-        height: IconSpec.tapTarget,
-        child: Center(
-          child: Material(
-            color: c.surfaceContainerHigh,
-            shape: const CircleBorder(),
-            clipBehavior: Clip.antiAlias,
-            child: InkWell(
-              onTap: () => onChanged(next),
-              child: SizedBox(
-                width: 40,
-                height: 40,
-                child: Center(child: ViewModeGlyph(mode: mode, color: c.icon)),
-              ),
-            ),
-          ),
-        ),
+    return Builder(
+      builder: (BuildContext anchor) => AppIconButton(
+        semanticLabel: '${mode.label} view. Change how links are drawn',
+        child: (Color color) => ViewModeGlyph(mode: mode, color: color),
+        onPressed: () async {
+          final LinkViewMode? picked = await showAppMenu<LinkViewMode>(
+            context: anchor,
+            anchorContext: anchor,
+            minWidth: 206,
+            entries: <AppMenuEntry<LinkViewMode>>[
+              for (final LinkViewMode m in LinkViewMode.values)
+                AppMenuEntry<LinkViewMode>(
+                  value: m,
+                  label: m.menuLabel,
+                  selected: m == mode,
+                  radio: true,
+                ),
+            ],
+          );
+          if (picked != null && picked != mode) onChanged(picked);
+        },
       ),
     );
   }

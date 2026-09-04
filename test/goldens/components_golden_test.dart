@@ -89,14 +89,10 @@ void main() {
             spacing: 6,
             runSpacing: 6,
             children: <Widget>[
-              const TagChip(label: 'default'),
-              TagChip(label: 'selected', style: ChipStyle.selected, onTap: () {}),
-              TagChip(
-                label: 'active filter',
-                style: ChipStyle.active,
-                onRemove: () {},
-              ),
-              TagChip(label: 'add', style: ChipStyle.add, onTap: () {}),
+              const TagChip(label: 'default', dot: true),
+              TagChip(label: 'selected', selected: true, onTap: () {}),
+              TagChip(label: 'active filter', selected: true, onRemove: () {}),
+              TagChip(label: 'add', add: true, onTap: () {}),
             ],
           ),
           tone,

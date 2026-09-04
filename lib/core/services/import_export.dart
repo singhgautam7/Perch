@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../db/database.dart';
 import '../db/tables.dart';
 import '../providers.dart';
+import 'import_sources.dart';
 
 /// A portable, human-readable backup: folders as a parentId tree, links with
 /// their tags and markdown note inline. Round-trips losslessly.
@@ -70,10 +71,17 @@ class ImportExportService {
 
   PerchDatabase get _db => _ref.read(databaseProvider);
 
-  Future<PerchArchive> buildArchive() async {
+  /// [onlyLinkIds] narrows the archive to a selection (board 3f, bulk Export);
+  /// folders and tags still travel with it so the file imports on its own.
+  Future<PerchArchive> buildArchive({List<int>? onlyLinkIds}) async {
     final List<Folder> folders = await _db.select(_db.folders).get();
     final List<Tag> tags = await _db.select(_db.tags).get();
-    final List<Link> links = await _db.select(_db.links).get();
+    final List<Link> all = await _db.select(_db.links).get();
+    final List<Link> links = onlyLinkIds == null
+        ? all
+        : all
+              .where((Link l) => onlyLinkIds.contains(l.id))
+              .toList(growable: false);
     final List<LinkTag> linkTags = await _db.select(_db.linkTags).get();
     final List<Setting> settings = await _db.select(_db.settings).get();
 
@@ -97,6 +105,7 @@ class ImportExportService {
               'name': f.name,
               'parentId': f.parentId,
               'sortIndex': f.sortIndex,
+              'color': f.color,
               'createdAt': f.createdAt.toIso8601String(),
               'updatedAt': f.updatedAt.toIso8601String(),
             },
@@ -122,6 +131,8 @@ class ImportExportService {
               'updatedAt': l.updatedAt.toIso8601String(),
               'openedAt': l.openedAt?.toIso8601String(),
               'openCount': l.openCount,
+              'isFavorite': l.isFavorite,
+              'sortIndex': l.sortIndex,
               'siteName': l.siteName,
               'description': l.description,
               'imageUrl': l.imageUrl,
@@ -137,8 +148,8 @@ class ImportExportService {
   }
 
   /// The export document, pretty-printed so it can be read in a text editor.
-  Future<String> exportJson() async {
-    final PerchArchive archive = await buildArchive();
+  Future<String> exportJson({List<int>? onlyLinkIds}) async {
+    final PerchArchive archive = await buildArchive(onlyLinkIds: onlyLinkIds);
     return compute(_encode, archive.toJson());
   }
 
@@ -170,6 +181,7 @@ class ImportExportService {
                   oldParent == null ? null : folderIds[oldParent as int],
                 ),
                 sortIndex: Value<int>((f['sortIndex'] as int?) ?? 0),
+                color: Value<int?>(f['color'] as int?),
                 createdAt: _date(f['createdAt']),
                 updatedAt: _date(f['updatedAt']),
               ),
@@ -209,6 +221,8 @@ class ImportExportService {
                   l['openedAt'] == null ? null : _date(l['openedAt']),
                 ),
                 openCount: Value<int>((l['openCount'] as int?) ?? 0),
+                isFavorite: Value<bool>((l['isFavorite'] as bool?) ?? false),
+                sortIndex: Value<int>((l['sortIndex'] as int?) ?? 0),
                 siteName: Value<String?>(l['siteName'] as String?),
                 description: Value<String?>(l['description'] as String?),
                 imageUrl: Value<String?>(l['imageUrl'] as String?),
@@ -258,6 +272,100 @@ class ImportExportService {
             );
       }
       return imported;
+    });
+  }
+
+  /// Board 3g — adds somebody else's export to what is already here, rather
+  /// than replacing it. Folders are created by path, tags by name, and a URL
+  /// that is already saved is skipped.
+  ///
+  /// Returns (imported, skipped).
+  Future<(int, int)> importLinks(List<ImportedLink> links) async {
+    return _db.transaction(() async {
+      final Map<String, int> folderByPath = <String, int>{};
+      final Map<String, int> tagByName = <String, int>{
+        for (final Tag t in await _db.select(_db.tags).get())
+          t.name.toLowerCase(): t.id,
+      };
+      final Set<String> existingUrls = <String>{
+        for (final Link l in await _db.select(_db.links).get()) l.url,
+      };
+
+      Future<int?> folderFor(List<String> path) async {
+        int? parent;
+        final StringBuffer key = StringBuffer();
+        for (final String name in path) {
+          key.write('/$name');
+          final int? cached = folderByPath[key.toString()];
+          if (cached != null) {
+            parent = cached;
+            continue;
+          }
+          final int? here = parent;
+          final Folder? found =
+              await (_db.select(_db.folders)..where(
+                    ($FoldersTable t) => here == null
+                        ? t.name.equals(name) & t.parentId.isNull()
+                        : t.name.equals(name) & t.parentId.equals(here),
+                  ))
+                  .getSingleOrNull();
+          final DateTime now = DateTime.now();
+          parent =
+              found?.id ??
+              await _db
+                  .into(_db.folders)
+                  .insert(
+                    FoldersCompanion.insert(
+                      name: name,
+                      parentId: Value<int?>(parent),
+                      createdAt: now,
+                      updatedAt: now,
+                    ),
+                  );
+          folderByPath[key.toString()] = parent;
+        }
+        return parent;
+      }
+
+      int imported = 0;
+      int skipped = 0;
+      for (final ImportedLink l in links) {
+        if (!existingUrls.add(l.url)) {
+          skipped++;
+          continue;
+        }
+        final DateTime when = l.createdAt ?? DateTime.now();
+        final int id = await _db
+            .into(_db.links)
+            .insert(
+              LinksCompanion.insert(
+                url: l.url,
+                title: Value<String>(l.title),
+                note: Value<String>(l.note),
+                folderId: Value<int?>(await folderFor(l.folderPath)),
+                isFavorite: Value<bool>(l.isFavorite),
+                createdAt: when,
+                updatedAt: when,
+              ),
+            );
+        for (final String tag in l.tags) {
+          final int tagId =
+              tagByName[tag.toLowerCase()] ??
+              (tagByName[tag.toLowerCase()] = await _db
+                  .into(_db.tags)
+                  .insert(
+                    TagsCompanion.insert(name: tag, createdAt: DateTime.now()),
+                  ));
+          await _db
+              .into(_db.linkTags)
+              .insert(
+                LinkTagsCompanion.insert(linkId: id, tagId: tagId),
+                mode: InsertMode.insertOrIgnore,
+              );
+        }
+        imported++;
+      }
+      return (imported, skipped);
     });
   }
 

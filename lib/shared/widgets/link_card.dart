@@ -15,15 +15,19 @@ import 'tag_chip.dart';
 
 /// One link, drawn in whichever of the three view modes is active.
 ///
-/// The variants share the preview ladder and the tag chips; only the layout
-/// differs, so they live together rather than drifting apart in three files.
+/// The variants share the preview ladder, the unopened dot, the pin star and
+/// the tag chips; only the layout differs, so they live together rather than
+/// drifting apart in three files.
 class LinkCard extends StatelessWidget {
   const LinkCard({
     required this.data,
     required this.mode,
     required this.onTap,
+    this.onLongPress,
     this.locationLabel,
     this.onLocationTap,
+    this.selectionMode = false,
+    this.selected = false,
     super.key,
   });
 
@@ -31,9 +35,17 @@ class LinkCard extends StatelessWidget {
   final LinkViewMode mode;
   final VoidCallback onTap;
 
+  /// Board 3d — hold for the quick-action menu, board 3f — hold to select.
+  final void Function(Offset globalPosition)? onLongPress;
+
   /// `Reading › Essays`. Null in Grid, which has no room for it.
   final String? locationLabel;
   final VoidCallback? onLocationTap;
+
+  /// Board 3f — every card grows a checkmark well on the left, and the
+  /// thumbnail stays put so the list does not reflow.
+  final bool selectionMode;
+  final bool selected;
 
   Link get link => data.link;
 
@@ -41,6 +53,11 @@ class LinkCard extends StatelessWidget {
   bool get _pending =>
       link.fetchStatus == FetchStatus.pending ||
       link.fetchStatus == FetchStatus.fetching;
+
+  /// Board 3f — 6dp of accent before the title until the link is first opened.
+  bool get _unopened => link.openedAt == null;
+
+  String get _title => link.title.isEmpty ? hostOf(link.url) : link.title;
 
   @override
   Widget build(BuildContext context) {
@@ -52,13 +69,107 @@ class LinkCard extends StatelessWidget {
     return RepaintBoundary(
       child: Semantics(
         button: true,
-        label: link.title.isEmpty ? hostOf(link.url) : link.title,
+        selected: selectionMode ? selected : null,
+        label: _title,
         child: Opacity(opacity: _pending ? 0.55 : 1, child: card),
       ),
     );
   }
 
-  String get _title => link.title.isEmpty ? hostOf(link.url) : link.title;
+  /// Wires tap and long-press once for every variant.
+  Widget _tappable({required BuildContext context, required Widget child}) {
+    return GestureDetector(
+      onLongPressStart: onLongPress == null
+          ? null
+          : (LongPressStartDetails d) => onLongPress!(d.globalPosition),
+      child: InkWell(onTap: onTap, child: child),
+    );
+  }
+}
+
+/// The title line: unopened dot, title, pin star.
+class _TitleLine extends StatelessWidget {
+  const _TitleLine({required this.card, this.maxLines = 3});
+
+  final LinkCard card;
+  final int maxLines;
+
+  @override
+  Widget build(BuildContext context) {
+    final PerchColors c = context.colors;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      spacing: Space.sm,
+      children: <Widget>[
+        Expanded(
+          child: Text.rich(
+            TextSpan(
+              children: <InlineSpan>[
+                if (card._unopened)
+                  WidgetSpan(
+                    alignment: PlaceholderAlignment.middle,
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: Container(
+                        width: 6,
+                        height: 6,
+                        decoration: BoxDecoration(
+                          color: c.primary,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ),
+                  ),
+                TextSpan(text: card._title),
+              ],
+            ),
+            style: PerchType.titleMedium.copyWith(
+              fontSize: 14.5,
+              height: 1.35,
+              color: c.onSurface,
+            ),
+            maxLines: maxLines,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        if (card.link.isFavorite)
+          Text('★', style: TextStyle(fontSize: 17, height: 1, color: c.primary)),
+      ],
+    );
+  }
+}
+
+/// The 22dp well board 3f puts on the left of every card in selection mode.
+class _SelectionWell extends StatelessWidget {
+  const _SelectionWell({required this.selected, this.height = 82});
+
+  final bool selected;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    final PerchColors c = context.colors;
+    return SizedBox(
+      height: height,
+      child: Center(
+        child: Container(
+          width: 22,
+          height: 22,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: selected ? c.primary : Colors.transparent,
+            border: Border.all(
+              color: selected ? c.primary : c.outline,
+              width: 1.8,
+            ),
+          ),
+          child: selected
+              ? Icon(Icons.check_rounded, size: 14, color: c.onPrimary)
+              : null,
+        ),
+      ),
+    );
+  }
 }
 
 /// Large list — 82dp thumbnail, domain and age, tags, a one-line note preview.
@@ -71,23 +182,25 @@ class _Large extends StatelessWidget {
   Widget build(BuildContext context) {
     final PerchColors c = context.colors;
     final Link link = card.link;
+    final bool on = card.selectionMode && card.selected;
 
     return Material(
-      color: c.surfaceContainer,
+      color: on ? c.primaryContainer : c.surfaceContainer,
       borderRadius: Radii.cardR,
       clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: card.onTap,
+      child: card._tappable(
+        context: context,
         child: Container(
           padding: const EdgeInsets.all(11),
           decoration: BoxDecoration(
             borderRadius: Radii.cardR,
-            border: Border.all(color: c.outline),
+            border: Border.all(color: on ? c.primary : c.outline),
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             spacing: Space.md,
             children: <Widget>[
+              if (card.selectionMode) _SelectionWell(selected: card.selected),
               LinkThumbnail(
                 url: link.url,
                 imageUrl: link.imageUrl,
@@ -98,12 +211,7 @@ class _Large extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                    Text(
-                      card._title,
-                      style: PerchType.titleMedium.copyWith(color: c.onSurface),
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                    _TitleLine(card: card),
                     const SizedBox(height: Space.xs),
                     _MetaRow(card: card),
                     if (card.data.tags.isNotEmpty) ...<Widget>[
@@ -116,9 +224,8 @@ class _Large extends StatelessWidget {
                             TagChip(
                               label: tag.name,
                               compact: true,
-                              style: tag.color == null
-                                  ? ChipStyle.plain
-                                  : ChipStyle.active,
+                              color: c.tagColor(tag.color),
+                              selected: tag.color != null,
                             ),
                         ],
                       ),
@@ -129,7 +236,7 @@ class _Large extends StatelessWidget {
                         notePreview(link.note),
                         style: PerchType.bodySmall.copyWith(
                           color: c.onSurfaceVariant,
-                          height: 1.4,
+                          height: 1.35,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -177,16 +284,11 @@ class _MetaRow extends StatelessWidget {
             child: GestureDetector(
               onTap: card.onLocationTap,
               behavior: HitTestBehavior.opaque,
-              child: Opacity(
-                opacity: 0.9,
-                child: Text(
-                  '↳ ${card.locationLabel}',
-                  style: PerchType.monoSmall.copyWith(
-                    color: c.onSurfaceMuted,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
+              child: Text(
+                '↳ ${card.locationLabel}',
+                style: PerchType.monoSmall.copyWith(color: c.onSurfaceMuted),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           ),
@@ -205,8 +307,8 @@ class _Minimal extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final PerchColors c = context.colors;
-    return InkWell(
-      onTap: card.onTap,
+    return card._tappable(
+      context: context,
       child: Padding(
         padding: const EdgeInsets.symmetric(
           horizontal: Space.row,
@@ -215,6 +317,8 @@ class _Minimal extends StatelessWidget {
         child: Row(
           spacing: Space.row,
           children: <Widget>[
+            if (card.selectionMode)
+              _SelectionWell(selected: card.selected, height: 30),
             LinkThumbnail(
               url: card.link.url,
               imageUrl: card.link.imageUrl,
@@ -226,15 +330,7 @@ class _Minimal extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  Text(
-                    card._title,
-                    style: PerchType.label.copyWith(
-                      fontSize: 12.5,
-                      color: c.onSurface,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                  _TitleLine(card: card, maxLines: 1),
                   Text(
                     hostOf(card.link.url),
                     style: PerchType.monoSmall.copyWith(
@@ -262,44 +358,49 @@ class _Grid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final PerchColors c = context.colors;
+    final bool on = card.selectionMode && card.selected;
     return Material(
-      color: c.surfaceContainer,
+      color: on ? c.primaryContainer : c.surfaceContainer,
       borderRadius: BorderRadius.circular(18),
       clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: card.onTap,
+      child: card._tappable(
+        context: context,
         child: DecoratedBox(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: c.outline),
+            border: Border.all(color: on ? c.primary : c.outline),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              LinkThumbnail(
-                url: card.link.url,
-                imageUrl: card.link.imageUrl,
-                faviconUrl: card.link.faviconUrl,
-                size: 116,
-                radius: 0,
-                fill: true,
+              Stack(
+                children: <Widget>[
+                  LinkThumbnail(
+                    url: card.link.url,
+                    imageUrl: card.link.imageUrl,
+                    faviconUrl: card.link.faviconUrl,
+                    size: 116,
+                    radius: 0,
+                    fill: true,
+                  ),
+                  if (card.selectionMode)
+                    Positioned(
+                      left: Space.sm,
+                      top: Space.sm,
+                      child: _SelectionWell(
+                        selected: card.selected,
+                        height: 22,
+                      ),
+                    ),
+                ],
               ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(Space.row, 9, Space.row, 11),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                    Text(
-                      card._title,
-                      style: PerchType.label.copyWith(
-                        fontSize: 12.5,
-                        height: 1.35,
-                        color: c.onSurface,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                    _TitleLine(card: card, maxLines: 2),
                     const SizedBox(height: Space.xs),
                     Text(
                       hostOf(card.link.url),

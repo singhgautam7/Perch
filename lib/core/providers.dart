@@ -41,6 +41,13 @@ final Provider<SearchRepository> searchRepositoryProvider =
       ),
     );
 
+/// Every tag with its link count, live. Tags are few, so one watch feeds the
+/// picker, the management screen and the filter sheet.
+final StreamProvider<List<TagWithCount>> allTagsProvider =
+    StreamProvider<List<TagWithCount>>((Ref ref) {
+      return ref.watch(tagRepositoryProvider).watchAll();
+    });
+
 /// Settings are held in memory and written through, so reading the theme is
 /// synchronous and a change repaints exactly the widgets that selected on it.
 class SettingsController extends Notifier<AppSettings> {
@@ -85,12 +92,6 @@ class SettingsController extends Notifier<AppSettings> {
     SettingsRepository.kViewMode,
     mode.name,
     state.copyWith(viewMode: mode),
-  );
-
-  Future<void> setFolderView(FolderViewMode mode) => _put(
-    SettingsRepository.kFolderView,
-    mode.name,
-    state.copyWith(folderView: mode),
   );
 
   Future<void> setFolderSort(FolderSort sort) => _put(

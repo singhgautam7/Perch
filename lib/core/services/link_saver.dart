@@ -25,7 +25,7 @@ class LinkSaver {
     String title = '',
     String note = '',
     int? folderId,
-    List<String> tags = const <String>[],
+    List<int> tagIds = const <int>[],
     LinkMetadata? metadata,
   }) async {
     final int id = await _links.create(
@@ -35,8 +35,8 @@ class LinkSaver {
       folderId: folderId,
       fetchStatus: metadata == null ? FetchStatus.pending : FetchStatus.ok,
     );
-    if (tags.isNotEmpty) {
-      await _ref.read(tagRepositoryProvider).setForLink(id, tags);
+    if (tagIds.isNotEmpty) {
+      await _ref.read(tagRepositoryProvider).setForLinkByIds(id, tagIds);
     }
 
     if (metadata != null) {

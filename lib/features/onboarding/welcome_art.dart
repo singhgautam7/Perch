@@ -183,7 +183,7 @@ class OrganiseArt extends StatelessWidget {
                   spacing: 5,
                   runSpacing: 5,
                   children: <Widget>[
-                    TagChip(label: 'reading', style: ChipStyle.active, compact: true),
+                    TagChip(label: 'reading', selected: true, compact: true),
                     TagChip(label: 'essays', compact: true),
                   ],
                 ),

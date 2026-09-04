@@ -24,7 +24,7 @@ class _PerchAppState extends ConsumerState<PerchApp> {
   late final GoRouter _router = buildRouter(
     settings: ref.read(settingsProvider),
   );
-  StreamSubscription<int>? _savedFromShare;
+  StreamSubscription<ShareResult>? _savedFromShare;
 
   @override
   void initState() {
@@ -45,7 +45,7 @@ class _PerchAppState extends ConsumerState<PerchApp> {
     super.dispose();
   }
 
-  void _confirmShareSave(int id) {
+  void _confirmShareSave(ShareResult result) {
     final BuildContext? context = _router
         .routerDelegate
         .navigatorKey
@@ -54,10 +54,14 @@ class _PerchAppState extends ConsumerState<PerchApp> {
     AppSnackbar.show(
       context,
       SnackMessage(
-        text: 'Saved to Unsorted',
-        variant: SnackVariant.success,
+        text: result.duplicate
+            ? 'You already saved this'
+            : 'Saved to Unsorted',
+        variant: result.duplicate
+            ? SnackVariant.warning
+            : SnackVariant.success,
         actionLabel: 'Open',
-        onAction: () => _router.push(Routes.link(id)),
+        onAction: () => _router.push(Routes.link(result.id)),
       ),
     );
   }

@@ -63,6 +63,11 @@ abstract final class Motion {
   static const Duration navHide = Duration(milliseconds: 160);
   static const Duration shimmerLoop = Duration(milliseconds: 1100);
 
+  /// Board 3h — the snackbar enters from its anchored edge and leaves the way
+  /// the finger sent it.
+  static const Duration snackEnter = Duration(milliseconds: 180);
+  static const Duration snackExit = Duration(milliseconds: 140);
+
   /// Anything the finger caused.
   static const Curve spring = Curves.easeOutBack;
 

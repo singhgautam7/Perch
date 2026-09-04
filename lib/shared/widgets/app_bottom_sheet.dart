@@ -4,157 +4,140 @@ import '../../core/theme/app_theme.dart';
 import '../../core/theme/palette.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/theme/typography.dart';
+import 'app_icon_button.dart';
 
 /// The one sheet shell — drag handle, 28dp top radius, safe area, scrollable
 /// body. Filters, pickers, option lists and confirmations all sit in it.
 ///
-/// The header is built from whichever of [icon], [title], [description] and
-/// [showClose] are supplied; a sheet with none of them is just the handle and
-/// the body.
+/// Boards 3b, 3c and 3e: the title is Instrument Serif, the close is the same
+/// [AppIconButton] every header uses, and an [expand] sheet gets a sticky
+/// header rule and a sticky footer.
 class AppBottomSheet extends StatelessWidget {
   const AppBottomSheet({
     required this.child,
-    this.icon,
     this.title,
+    this.titleSize = 22,
     this.description,
+    this.headerAction,
     this.actions,
     this.showClose = true,
     this.scrollable = true,
+    this.expand = false,
     super.key,
   });
 
   final Widget child;
-
-  /// Sits in a tinted rounded square to the left of the title.
-  final IconData? icon;
   final String? title;
+  final double titleSize;
   final String? description;
+
+  /// Sits left of the close button — the filter sheet's Reset pill.
+  final Widget? headerAction;
 
   /// Pinned under the body, outside the scroll area.
   final Widget? actions;
   final bool showClose;
   final bool scrollable;
 
-  bool get _hasHeader => title != null || description != null || icon != null;
+  /// Board 3e — a full-height sheet whose body is the only thing that scrolls.
+  final bool expand;
+
+  bool get _hasHeader => title != null || description != null;
 
   @override
   Widget build(BuildContext context) {
     final PerchColors c = context.colors;
     final Widget body = Padding(
-      padding: const EdgeInsets.symmetric(horizontal: Space.screen),
+      padding: const EdgeInsets.symmetric(horizontal: Space.lg),
       child: child,
     );
 
+    final Widget header = Padding(
+      padding: const EdgeInsets.fromLTRB(Space.lg, 6, Space.lg, Space.md),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: <Widget>[
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                if (title != null)
+                  Text(
+                    title!,
+                    style: PerchType.sheetTitle.copyWith(
+                      fontSize: titleSize,
+                      color: c.onSurface,
+                    ),
+                  ),
+                if (description != null) ...<Widget>[
+                  if (title != null) const SizedBox(height: 5),
+                  Text(
+                    description!,
+                    style: PerchType.bodySmall.copyWith(
+                      height: 1.5,
+                      color: c.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          ?headerAction,
+          if (showClose)
+            AppIconButton(
+              icon: Icons.close_rounded,
+              onPressed: () => Navigator.of(context).pop(),
+              semanticLabel: 'Close',
+            ),
+        ],
+      ),
+    );
+
+    final Widget column = Column(
+      mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
+      children: <Widget>[
+        const SizedBox(height: Space.md),
+        Container(
+          width: 36,
+          height: 4,
+          decoration: BoxDecoration(color: c.outline, borderRadius: Radii.fullR),
+        ),
+        const SizedBox(height: Space.sm),
+        if (_hasHeader) ...<Widget>[
+          header,
+          if (expand) Divider(color: c.outline, height: 1),
+        ],
+        const SizedBox(height: Space.lg),
+        Flexible(
+          fit: expand ? FlexFit.tight : FlexFit.loose,
+          child: scrollable ? SingleChildScrollView(child: body) : body,
+        ),
+        if (actions != null) ...<Widget>[
+          if (expand) Divider(color: c.outline, height: 1),
+          const SizedBox(height: Space.md),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: Space.lg),
+            child: actions,
+          ),
+        ],
+        const SizedBox(height: Space.screen),
+      ],
+    );
+
     return Container(
+      constraints: expand
+          ? BoxConstraints(
+              minHeight: MediaQuery.sizeOf(context).height * 0.9,
+              maxHeight: MediaQuery.sizeOf(context).height * 0.9,
+            )
+          : const BoxConstraints(),
       decoration: BoxDecoration(
-        color: c.surfaceContainer,
+        color: c.surface,
         borderRadius: Radii.sheetR,
         border: Border.all(color: c.outline),
       ),
       clipBehavior: Clip.antiAlias,
-      child: SafeArea(
-        top: false,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            const SizedBox(height: Space.md),
-            Container(
-              width: 36,
-              height: 4,
-              decoration: BoxDecoration(
-                color: c.outline,
-                borderRadius: Radii.fullR,
-              ),
-            ),
-            if (_hasHeader) ...<Widget>[
-              const SizedBox(height: Space.lg),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: Space.screen),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  spacing: Space.md,
-                  children: <Widget>[
-                    if (icon != null)
-                      Container(
-                        width: 38,
-                        height: 38,
-                        decoration: BoxDecoration(
-                          color: c.primaryContainer,
-                          borderRadius: BorderRadius.circular(11),
-                        ),
-                        child: Icon(icon, size: 19, color: c.accent),
-                      ),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: <Widget>[
-                          if (title != null)
-                            Text(
-                              title!,
-                              style: PerchType.title.copyWith(
-                                color: c.onSurface,
-                              ),
-                            ),
-                          if (description != null) ...<Widget>[
-                            if (title != null) const SizedBox(height: Space.xs),
-                            Text(
-                              description!,
-                              style: PerchType.bodySmall.copyWith(
-                                height: 1.5,
-                                color: c.onSurfaceVariant,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                    if (showClose)
-                      _CloseButton(onTap: () => Navigator.of(context).pop()),
-                  ],
-                ),
-              ),
-            ],
-            const SizedBox(height: Space.lg),
-            Flexible(child: scrollable ? SingleChildScrollView(child: body) : body),
-            if (actions != null) ...<Widget>[
-              const SizedBox(height: Space.lg),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: Space.screen),
-                child: actions,
-              ),
-            ],
-            const SizedBox(height: Space.screen),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _CloseButton extends StatelessWidget {
-  const _CloseButton({required this.onTap});
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final PerchColors c = context.colors;
-    return Semantics(
-      button: true,
-      label: 'Close',
-      child: InkWell(
-        onTap: onTap,
-        customBorder: const CircleBorder(),
-        child: Container(
-          width: 34,
-          height: 34,
-          decoration: BoxDecoration(
-            color: c.surfaceContainerHigh,
-            shape: BoxShape.circle,
-          ),
-          child: Icon(Icons.close_rounded, size: 17, color: c.icon),
-        ),
-      ),
+      child: SafeArea(top: false, child: column),
     );
   }
 }
@@ -165,10 +148,12 @@ Future<T?> showAppBottomSheet<T>({
   required BuildContext context,
   required WidgetBuilder builder,
   String? title,
+  double titleSize = 22,
   String? description,
-  IconData? icon,
+  Widget? headerAction,
   Widget? actions,
   bool showClose = true,
+  bool expand = false,
   bool isScrollControlled = true,
 }) {
   return showModalBottomSheet<T>(
@@ -183,10 +168,12 @@ Future<T?> showAppBottomSheet<T>({
       padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
       child: AppBottomSheet(
         title: title,
+        titleSize: titleSize,
         description: description,
-        icon: icon,
+        headerAction: headerAction,
         actions: actions,
         showClose: showClose,
+        expand: expand,
         child: Builder(builder: builder),
       ),
     ),
@@ -221,13 +208,11 @@ Future<T?> showOptionSheet<T>({
   required List<SheetOption<T>> options,
   required T selected,
   String? description,
-  IconData? icon,
 }) {
   return showAppBottomSheet<T>(
     context: context,
     title: title,
     description: description,
-    icon: icon,
     builder: (BuildContext sheetContext) => Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,

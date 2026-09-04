@@ -1,34 +1,30 @@
-import 'dart:async';
-
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/db/database.dart';
 import '../../core/db/link_repository.dart';
 import '../../core/providers.dart';
-import '../../core/router/router.dart';
 import '../../core/services/link_saver.dart';
+import '../../core/router/router.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/palette.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/theme/typography.dart';
 import '../../core/utils/format.dart';
 import '../../core/utils/url.dart';
-import '../../shared/widgets/app_bottom_sheet.dart';
-import '../../shared/widgets/app_button.dart';
+import '../../shared/widgets/app_header.dart';
 import '../../shared/widgets/app_icon_button.dart';
-import '../../shared/widgets/app_snackbar.dart';
+import '../../shared/widgets/app_menu.dart';
 import '../../shared/widgets/breadcrumb.dart';
-import '../../shared/widgets/markdown_editor.dart';
+import '../../shared/widgets/link_thumbnail.dart';
 import '../../shared/widgets/states.dart';
 import '../../shared/widgets/tag_chip.dart';
-import '../add_link/tag_field.dart';
-import '../folders/folder_picker.dart';
+import '../../shared/widgets/tag_picker.dart';
 import '../folders/folder_providers.dart';
+import '../links/link_actions.dart';
 import '../links/link_feed.dart';
 import 'metadata_card.dart';
 import 'note_view.dart';
@@ -43,8 +39,9 @@ final FutureProviderFamily<LinkWithTags?, int> linkDetailProvider =
       return (await repo.withTags(<Link>[link])).firstOrNull;
     });
 
-/// Board 1f — the note is the body of this screen; metadata is one collapsed
-/// row above it. That ordering is the whole point of "link = note".
+/// Boards 1f and 3d — the note is the body of this screen; metadata is one
+/// collapsed row under it. The title is static: editing is an explicit act,
+/// and the pencil in the header opens the Add/Edit screen.
 class LinkDetailScreen extends ConsumerWidget {
   const LinkDetailScreen({required this.linkId, super.key});
 
@@ -84,53 +81,23 @@ class _Detail extends ConsumerStatefulWidget {
 
 class _DetailState extends ConsumerState<_Detail> {
   bool _metadataOpen = false;
-  bool _editingNote = false;
-  bool _editingTitle = false;
-  TextEditingController? _note;
-  TextEditingController? _title;
 
   Link get _link => widget.data.link;
-
-  @override
-  void dispose() {
-    _note?.dispose();
-    _title?.dispose();
-    super.dispose();
-  }
-
   LinkRepository get _repo => ref.read(linkRepositoryProvider);
 
-  Future<void> _open() async {
-    final Uri uri = Uri.parse(_link.url);
-    unawaited(_repo.markOpened(_link.id));
-    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
-      if (mounted) AppSnackbar.error(context, 'Nothing here can open that link');
-    }
-  }
+  Future<void> _open() => openLink(context, ref, _link);
 
-  void _startEditingNote() {
-    setState(() {
-      _note = TextEditingController(text: _link.note);
-      _editingNote = true;
-    });
-  }
+  /// B8 — a tick in the note writes straight back into the markdown.
+  Future<void> _saveNote(String markdown) =>
+      _repo.update(_link.id, LinksCompanion(note: Value<String>(markdown)));
 
-  Future<void> _saveNote() async {
-    final String text = _note?.text ?? '';
-    setState(() => _editingNote = false);
-    await _repo.update(_link.id, LinksCompanion(note: Value<String>(text)));
-    _note?.dispose();
-    _note = null;
-  }
-
-  Future<void> _saveTitle() async {
-    final String text = _title?.text.trim() ?? '';
-    setState(() => _editingTitle = false);
-    if (text.isNotEmpty && text != _link.title) {
-      await _repo.update(_link.id, LinksCompanion(title: Value<String>(text)));
-    }
-    _title?.dispose();
-    _title = null;
+  Future<void> _editTags() async {
+    final List<int>? picked = await showTagPicker(
+      context,
+      selected: widget.data.tags.map((Tag t) => t.id).toList(growable: false),
+    );
+    if (picked == null) return;
+    await ref.read(tagRepositoryProvider).setForLinkByIds(_link.id, picked);
   }
 
   @override
@@ -142,12 +109,24 @@ class _DetailState extends ConsumerState<_Detail> {
 
     return Column(
       children: <Widget>[
-        _TopBar(
-          link: _link,
-          editingNote: _editingNote,
-          onDone: _saveNote,
-          onRefetch: () => ref.read(linkSaverProvider).refresh(_link.id),
-          onDelete: () => _confirmDelete(context),
+        AppHeader(
+          title: '',
+          onBack: () => context.pop(),
+          actions: <Widget>[
+            AppIconButton(
+              icon: Icons.edit_outlined,
+              onPressed: () => context.push(Routes.editLink(_link.id)),
+              semanticLabel: 'Edit link',
+            ),
+            AppIconButton(
+              icon: Icons.ios_share_rounded,
+              onPressed: () => SharePlus.instance.share(
+                ShareParams(uri: Uri.parse(_link.url)),
+              ),
+              semanticLabel: 'Share link',
+            ),
+            _OverflowButton(link: _link),
+          ],
         ),
         Expanded(
           child: ListView(
@@ -168,42 +147,84 @@ class _DetailState extends ConsumerState<_Detail> {
                     ),
                   ),
                 ),
-              _Title(
-                link: _link,
-                editing: _editingTitle,
-                controller: _title,
-                onStartEditing: () => setState(() {
-                  _title = TextEditingController(text: _link.title);
-                  _editingTitle = true;
-                }),
-                onDone: _saveTitle,
+              // Tapping the hero or the title opens the link.
+              Semantics(
+                button: true,
+                label: 'Open link',
+                child: GestureDetector(
+                  onTap: _open,
+                  behavior: HitTestBehavior.opaque,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(22),
+                        child: SizedBox(
+                          height: 186,
+                          width: double.infinity,
+                          child: LinkThumbnail(
+                            url: _link.url,
+                            imageUrl: _link.imageUrl,
+                            faviconUrl: _link.faviconUrl,
+                            size: 186,
+                            radius: 0,
+                            fill: true,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: Space.lg),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        spacing: Space.row,
+                        children: <Widget>[
+                          Expanded(
+                            child: Text(
+                              _link.title.isEmpty
+                                  ? hostOf(_link.url)
+                                  : _link.title,
+                              style: PerchType.title.copyWith(
+                                fontSize: 21,
+                                height: 1.25,
+                                color: c.onSurface,
+                              ),
+                            ),
+                          ),
+                          _PinButton(link: _link),
+                        ],
+                      ),
+                      const SizedBox(height: 7),
+                      Text(
+                        '${hostOf(_link.url)} · saved '
+                        '${shortAge(_link.createdAt)} ago',
+                        style: PerchType.monoLabel.copyWith(
+                          fontSize: 12,
+                          color: c.onSurfaceVariant,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
               ),
-              const SizedBox(height: Space.sm),
-              _DomainRow(link: _link),
+              const SizedBox(height: Space.md),
+              _TagRow(data: widget.data, onAdd: _editTags),
               const SizedBox(height: Space.lg),
-              AppButton(
-                label: 'Open link ↗',
-                fullWidth: true,
-                onPressed: _open,
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: c.surfaceContainer,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: c.outline),
+                ),
+                child: NoteView(markdown: _link.note, onToggle: _saveNote),
               ),
-              const SizedBox(height: Space.row),
+              const SizedBox(height: Space.md),
               MetadataCard(
                 link: _link,
                 open: _metadataOpen,
                 onToggle: () => setState(() => _metadataOpen = !_metadataOpen),
-                onRefetch: () => ref.read(linkSaverProvider).refresh(_link.id),
               ),
-              const SizedBox(height: Space.lg),
-              _TagRow(data: widget.data),
-              const SizedBox(height: Space.lg),
-              if (_editingNote)
-                MarkdownEditor(
-                  controller: _note!,
-                  minLines: 8,
-                  maxLines: 30,
-                )
-              else
-                NoteView(markdown: _link.note, onTap: _startEditingNote),
               const SizedBox(height: Space.section),
               Text(
                 'Saved ${longDate(_link.createdAt)}',
@@ -216,299 +237,133 @@ class _DetailState extends ConsumerState<_Detail> {
       ],
     );
   }
-
-  Future<void> _confirmDelete(BuildContext context) async {
-    final bool? confirmed = await showAppBottomSheet<bool>(
-      context: context,
-      title: 'Delete this link?',
-      builder: (BuildContext sheetContext) => Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: <Widget>[
-          Text(
-            'The link and its note go for good.',
-            style: PerchType.body.copyWith(
-              color: sheetContext.colors.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: Space.xl),
-          AppButton(
-            label: 'Delete',
-            type: AppButtonType.danger,
-            fullWidth: true,
-            onPressed: () => Navigator.of(sheetContext).pop(true),
-          ),
-          const SizedBox(height: Space.sm),
-          AppButton(
-            label: 'Keep it',
-            type: AppButtonType.outlined,
-            fullWidth: true,
-            onPressed: () => Navigator.of(sheetContext).pop(false),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !context.mounted) return;
-    await _repo.delete(_link.id);
-    if (context.mounted) context.pop();
-  }
 }
 
-class _TopBar extends StatelessWidget {
-  const _TopBar({
-    required this.link,
-    required this.editingNote,
-    required this.onDone,
-    required this.onRefetch,
-    required this.onDelete,
-  });
-
-  final Link link;
-  final bool editingNote;
-  final VoidCallback onDone;
-  final VoidCallback onRefetch;
-  final VoidCallback onDelete;
-
-  @override
-  Widget build(BuildContext context) {
-    final PerchColors c = context.colors;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(Space.lg, Space.md, Space.lg, Space.sm),
-      child: Row(
-        children: <Widget>[
-          AppIconButton(
-            icon: Icons.arrow_back_rounded,
-            onPressed: () => context.pop(),
-            semanticLabel: 'Back',
-            size: 40,
-          ),
-          if (editingNote) ...<Widget>[
-            Expanded(
-              child: Text(
-                'Editing note',
-                style: PerchType.screenTitle.copyWith(color: c.onSurface),
-              ),
-            ),
-            AppButton(label: 'Done', compact: true, onPressed: onDone),
-          ] else ...<Widget>[
-            const Spacer(),
-            AppIconButton(
-              icon: Icons.ios_share_rounded,
-              onPressed: () => SharePlus.instance.share(
-                ShareParams(uri: Uri.parse(link.url)),
-              ),
-              semanticLabel: 'Share link',
-              size: 40,
-              filled: false,
-            ),
-            _OverflowMenu(onRefetch: onRefetch, onDelete: onDelete),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _OverflowMenu extends StatelessWidget {
-  const _OverflowMenu({required this.onRefetch, required this.onDelete});
-
-  final VoidCallback onRefetch;
-  final VoidCallback onDelete;
-
-  @override
-  Widget build(BuildContext context) {
-    final PerchColors c = context.colors;
-    return SizedBox(
-      width: IconSpec.tapTarget,
-      height: IconSpec.tapTarget,
-      child: PopupMenuButton<VoidCallback>(
-        tooltip: 'More actions',
-        icon: Icon(Icons.more_vert_rounded, color: c.icon),
-        color: c.surfaceContainer,
-        shape: const RoundedRectangleBorder(borderRadius: Radii.thumbR),
-        onSelected: (VoidCallback action) => action(),
-        itemBuilder: (BuildContext context) => <PopupMenuEntry<VoidCallback>>[
-          PopupMenuItem<VoidCallback>(
-            value: onRefetch,
-            child: Text('Re-fetch metadata', style: PerchType.body),
-          ),
-          PopupMenuItem<VoidCallback>(
-            value: onDelete,
-            child: Text(
-              'Delete link',
-              style: PerchType.body.copyWith(color: c.danger),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Long titles wrap to three lines and then clamp.
-class _Title extends StatelessWidget {
-  const _Title({
-    required this.link,
-    required this.editing,
-    required this.controller,
-    required this.onStartEditing,
-    required this.onDone,
-  });
-
-  final Link link;
-  final bool editing;
-  final TextEditingController? controller;
-  final VoidCallback onStartEditing;
-  final VoidCallback onDone;
-
-  @override
-  Widget build(BuildContext context) {
-    final PerchColors c = context.colors;
-    final TextStyle style = PerchType.title.copyWith(
-      fontSize: 26,
-      height: 1.2,
-      color: c.onSurface,
-    );
-
-    if (editing && controller != null) {
-      return TextField(
-        controller: controller,
-        autofocus: true,
-        maxLines: 3,
-        style: style,
-        textInputAction: TextInputAction.done,
-        onSubmitted: (_) => onDone(),
-        onTapOutside: (_) => onDone(),
-        decoration: const InputDecoration(
-          isDense: true,
-          border: InputBorder.none,
-          contentPadding: EdgeInsets.zero,
-        ),
-      );
-    }
-
-    return Semantics(
-      button: true,
-      label: 'Edit title',
-      child: GestureDetector(
-        onTap: onStartEditing,
-        behavior: HitTestBehavior.opaque,
-        child: Text(
-          link.title.isEmpty ? hostOf(link.url) : link.title,
-          style: style,
-          maxLines: 3,
-          overflow: TextOverflow.ellipsis,
-        ),
-      ),
-    );
-  }
-}
-
-/// The domain row never wraps.
-class _DomainRow extends StatelessWidget {
-  const _DomainRow({required this.link});
-
-  final Link link;
-
-  @override
-  Widget build(BuildContext context) {
-    final PerchColors c = context.colors;
-    return Text(
-      '${hostOf(link.url)} · saved ${shortAge(link.createdAt)} ago',
-      style: PerchType.monoLabel.copyWith(
-        fontSize: 12,
-        color: c.onSurfaceVariant,
-      ),
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
-    );
-  }
-}
-
-/// Tags past three collapse to +N, which expands the row in place.
-class _TagRow extends ConsumerStatefulWidget {
-  const _TagRow({required this.data});
-
-  final LinkWithTags data;
-
-  @override
-  ConsumerState<_TagRow> createState() => _TagRowState();
-}
-
-class _TagRowState extends ConsumerState<_TagRow> {
-  bool _expanded = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final List<Tag> tags = widget.data.tags;
-    final bool overflowing = tags.length > 3 && !_expanded;
-    final List<Tag> shown = overflowing ? tags.sublist(0, 3) : tags;
-
-    Future<void> setTags(List<String> names) => ref
-        .read(tagRepositoryProvider)
-        .setForLink(widget.data.link.id, names);
-
-    return Wrap(
-      spacing: 6,
-      runSpacing: 6,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      children: <Widget>[
-        for (final Tag tag in shown)
-          TagChip(
-            label: tag.name,
-            style: ChipStyle.active,
-            onRemove: () => setTags(
-              tags
-                  .where((Tag t) => t.id != tag.id)
-                  .map((Tag t) => t.name)
-                  .toList(growable: false),
-            ),
-          ),
-        if (overflowing)
-          TagChip(
-            label: '+${tags.length - 3} more',
-            onTap: () => setState(() => _expanded = true),
-          ),
-        TagChip(
-          label: 'Add tag',
-          style: ChipStyle.add,
-          onTap: () async {
-            final String? picked = await showTagPicker(
-              context,
-              exclude: tags.map((Tag t) => t.name).toList(growable: false),
-            );
-            if (picked == null) return;
-            await setTags(<String>[
-              ...tags.map((Tag t) => t.name),
-              picked,
-            ]);
-          },
-        ),
-        _MoveChip(link: widget.data.link),
-      ],
-    );
-  }
-}
-
-class _MoveChip extends ConsumerWidget {
-  const _MoveChip({required this.link});
+/// Board 3f — the pin lives on the card as a star; here it is the same toggle.
+class _PinButton extends ConsumerWidget {
+  const _PinButton({required this.link});
 
   final Link link;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return TagChip(
-      label: 'Move ⇄',
-      onTap: () async {
-        final FolderChoice? choice = await showFolderPicker(context);
-        if (choice == null || !context.mounted) return;
-        await ref
+    final PerchColors c = context.colors;
+    return Semantics(
+      button: true,
+      selected: link.isFavorite,
+      label: link.isFavorite ? 'Unpin' : 'Pin to top',
+      child: GestureDetector(
+        onTap: () => ref
             .read(linkRepositoryProvider)
-            .moveToFolder(link.id, choice.folderId);
-        if (context.mounted) {
-          AppSnackbar.success(context, 'Moved to ${choice.name}');
-        }
-      },
+            .setFavorite(link.id, value: !link.isFavorite),
+        behavior: HitTestBehavior.opaque,
+        child: SizedBox(
+          width: 34,
+          height: 34,
+          child: Center(
+            child: Text(
+              link.isFavorite ? '★' : '☆',
+              style: TextStyle(
+                fontSize: 20,
+                height: 1,
+                color: link.isFavorite ? c.primary : c.onSurfaceMuted,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Everything secondary. Delete is separated by a rule and takes the danger
+/// role (board 3d).
+enum _DetailMenu { copy, move, refresh, delete }
+
+class _OverflowButton extends ConsumerWidget {
+  const _OverflowButton({required this.link});
+
+  final Link link;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Builder(
+      builder: (BuildContext anchor) => AppIconButton(
+        icon: Icons.more_vert_rounded,
+        semanticLabel: 'More actions',
+        onPressed: () async {
+          final _DetailMenu? picked = await showAppMenu<_DetailMenu>(
+            context: anchor,
+            anchorContext: anchor,
+            minWidth: 220,
+            entries: const <AppMenuEntry<_DetailMenu>>[
+              AppMenuEntry<_DetailMenu>(
+                value: _DetailMenu.copy,
+                label: 'Copy URL',
+              ),
+              AppMenuEntry<_DetailMenu>(
+                value: _DetailMenu.move,
+                label: 'Move to folder…',
+              ),
+              AppMenuEntry<_DetailMenu>(
+                value: _DetailMenu.refresh,
+                label: 'Refresh metadata',
+              ),
+              AppMenuEntry<_DetailMenu>.divider(),
+              AppMenuEntry<_DetailMenu>(
+                value: _DetailMenu.delete,
+                label: 'Delete link',
+                danger: true,
+              ),
+            ],
+          );
+          if (picked == null || !context.mounted) return;
+          switch (picked) {
+            case _DetailMenu.copy:
+              await runLinkAction(context, ref, link, LinkAction.copy);
+            case _DetailMenu.move:
+              await runLinkAction(context, ref, link, LinkAction.move);
+            case _DetailMenu.refresh:
+              await ref.read(linkSaverProvider).refresh(link.id);
+            case _DetailMenu.delete:
+              final bool gone = await confirmDeleteLinks(
+                context,
+                ref,
+                <int>[link.id],
+              );
+              if (gone && context.mounted) context.pop();
+          }
+        },
+      ),
+    );
+  }
+}
+
+/// Board 3d — tags are real chips in their own colour and each one filters.
+/// `＋ Add tag` is a quiet dashed chip *after* them, never a replacement.
+class _TagRow extends StatelessWidget {
+  const _TagRow({required this.data, required this.onAdd});
+
+  final LinkWithTags data;
+  final VoidCallback onAdd;
+
+  @override
+  Widget build(BuildContext context) {
+    final PerchColors c = context.colors;
+    return Wrap(
+      spacing: 7,
+      runSpacing: 2,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: <Widget>[
+        for (final Tag tag in data.tags)
+          TagChip(
+            label: tag.name,
+            selected: true,
+            color: c.tagColor(tag.color),
+            onTap: () => context.push(Routes.tagged(tag.id)),
+          ),
+        TagChip(label: 'Add tag', add: true, onTap: onAdd),
+      ],
     );
   }
 }

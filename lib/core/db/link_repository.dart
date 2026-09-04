@@ -17,13 +17,27 @@ enum LinkSort {
   newest,
   oldest,
   titleAsc,
-  recentlyOpened;
+  domain,
+  recentlyOpened,
+  mostOpened;
 
   String get label => switch (this) {
     LinkSort.newest => 'Newest first',
     LinkSort.oldest => 'Oldest first',
     LinkSort.titleAsc => 'Title A–Z',
+    LinkSort.domain => 'Domain',
     LinkSort.recentlyOpened => 'Recently opened',
+    LinkSort.mostOpened => 'Most opened',
+  };
+
+  /// The short form the mono control beside a count row shows.
+  String get short => switch (this) {
+    LinkSort.newest => 'Newest',
+    LinkSort.oldest => 'Oldest',
+    LinkSort.titleAsc => 'A–Z',
+    LinkSort.domain => 'Domain',
+    LinkSort.recentlyOpened => 'Opened',
+    LinkSort.mostOpened => 'Most read',
   };
 }
 
@@ -60,8 +74,11 @@ class LinkRepository {
         OrderingTerm(expression: t.createdAt),
       LinkSort.titleAsc => ($LinksTable t) =>
         OrderingTerm(expression: t.title.lower()),
+      LinkSort.domain => ($LinksTable t) => OrderingTerm(expression: t.url),
       LinkSort.recentlyOpened => ($LinksTable t) =>
         OrderingTerm(expression: t.openedAt, mode: OrderingMode.desc),
+      LinkSort.mostOpened => ($LinksTable t) =>
+        OrderingTerm(expression: t.openCount, mode: OrderingMode.desc),
     };
   }
 
@@ -152,4 +169,55 @@ class LinkRepository {
 
   Future<void> moveToFolder(int id, int? folderId) =>
       update(id, LinksCompanion(folderId: Value<int?>(folderId)));
+
+  /// Board 3f — pinned links gather into their own section above the count row.
+  /// There are few of them by definition, so they are fetched whole.
+  Future<List<LinkWithTags>> favorites({int? folderId, bool allLinks = true}) {
+    final SimpleSelectStatement<$LinksTable, Link> q = _db.select(_db.links)
+      ..where(($LinksTable t) => t.isFavorite.equals(true));
+    if (!allLinks) {
+      q.where(
+        ($LinksTable t) =>
+            folderId == null ? t.folderId.isNull() : t.folderId.equals(folderId),
+      );
+    }
+    q.orderBy(<OrderingTerm Function($LinksTable)>[
+      ($LinksTable t) =>
+          OrderingTerm(expression: t.createdAt, mode: OrderingMode.desc),
+    ]);
+    return q.get().then(withTags);
+  }
+
+  Future<void> setFavorite(int id, {required bool value}) =>
+      update(id, LinksCompanion(isFavorite: Value<bool>(value)));
+
+  Future<void> setFavorites(Iterable<int> ids, {required bool value}) =>
+      (_db.update(_db.links)..where(($LinksTable t) => t.id.isIn(ids))).write(
+        LinksCompanion(
+          isFavorite: Value<bool>(value),
+          updatedAt: Value<DateTime>(DateTime.now()),
+        ),
+      );
+
+  Future<void> deleteAll(Iterable<int> ids) =>
+      (_db.delete(_db.links)..where(($LinksTable t) => t.id.isIn(ids))).go();
+
+  Future<void> moveAllToFolder(Iterable<int> ids, int? folderId) =>
+      (_db.update(_db.links)..where(($LinksTable t) => t.id.isIn(ids))).write(
+        LinksCompanion(
+          folderId: Value<int?>(folderId),
+          updatedAt: Value<DateTime>(DateTime.now()),
+        ),
+      );
+
+  /// Every link that never resolved a preview image — the batch refresh in
+  /// board 3g works through exactly this list.
+  Future<List<Link>> missingPreviews() =>
+      (_db.select(_db.links)
+            ..where(($LinksTable t) => t.imageUrl.isNull())
+            ..orderBy(<OrderingTerm Function($LinksTable)>[
+              ($LinksTable t) =>
+                  OrderingTerm(expression: t.createdAt, mode: OrderingMode.desc),
+            ]))
+          .get();
 }

@@ -221,3 +221,16 @@ class ListSkeleton extends StatelessWidget {
     );
   }
 }
+
+/// The tail of a paged list — quieter than a spinner, and it says why.
+class LoadingMore extends StatelessWidget {
+  const LoadingMore({super.key});
+
+  @override
+  Widget build(BuildContext context) => Text(
+    'Loading more…',
+    style: PerchType.monoLabel.copyWith(
+      color: context.colors.onSurfaceVariant,
+    ),
+  );
+}

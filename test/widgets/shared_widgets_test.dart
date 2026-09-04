@@ -65,7 +65,7 @@ void main() {
       host(
         TagChip(
           label: 'reading',
-          style: ChipStyle.active,
+          selected: true,
           onTap: () => taps++,
           onRemove: () => removes++,
         ),

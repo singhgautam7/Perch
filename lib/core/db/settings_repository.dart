@@ -15,21 +15,17 @@ enum LinkViewMode {
     LinkViewMode.minimal => 'Minimal',
     LinkViewMode.grid => 'Grid',
   };
+
+  /// The wording the anchored switcher uses (board 3a).
+  String get menuLabel => switch (this) {
+    LinkViewMode.large => 'Large list',
+    LinkViewMode.minimal => 'Minimal list',
+    LinkViewMode.grid => 'Grid',
+  };
 }
 
 /// Which tab Perch opens on.
 enum LandingTab { links, folders }
-
-/// How the Folders tab lays its folders out.
-enum FolderViewMode {
-  list,
-  grid;
-
-  String get label => switch (this) {
-    FolderViewMode.list => 'List',
-    FolderViewMode.grid => 'Grid',
-  };
-}
 
 /// How folders are ordered.
 enum FolderSort {
@@ -62,7 +58,6 @@ class AppSettings {
     this.dynamicColor = false,
     this.blur = false,
     this.viewMode = LinkViewMode.large,
-    this.folderView = FolderViewMode.list,
     this.folderSort = FolderSort.name,
     this.landingTab = LandingTab.links,
     this.sort = LinkSort.newest,
@@ -81,7 +76,6 @@ class AppSettings {
   /// The one real GPU cost in the app — off on first run.
   final bool blur;
   final LinkViewMode viewMode;
-  final FolderViewMode folderView;
   final FolderSort folderSort;
   final LandingTab landingTab;
   final LinkSort sort;
@@ -108,7 +102,6 @@ class AppSettings {
     bool? dynamicColor,
     bool? blur,
     LinkViewMode? viewMode,
-    FolderViewMode? folderView,
     FolderSort? folderSort,
     LandingTab? landingTab,
     LinkSort? sort,
@@ -122,7 +115,6 @@ class AppSettings {
       dynamicColor: dynamicColor ?? this.dynamicColor,
       blur: blur ?? this.blur,
       viewMode: viewMode ?? this.viewMode,
-      folderView: folderView ?? this.folderView,
       folderSort: folderSort ?? this.folderSort,
       landingTab: landingTab ?? this.landingTab,
       sort: sort ?? this.sort,
@@ -143,7 +135,6 @@ class SettingsRepository {
   static const String kDynamic = 'theme.dynamic';
   static const String kBlur = 'appearance.blur';
   static const String kViewMode = 'links.view';
-  static const String kFolderView = 'folders.view';
   static const String kFolderSort = 'folders.sort';
   static const String kLanding = 'app.landing';
   static const String kSort = 'links.sort';
@@ -171,7 +162,6 @@ class SettingsRepository {
       dynamicColor: m[kDynamic] == 'true',
       blur: m[kBlur] == 'true',
       viewMode: pick(kViewMode, LinkViewMode.values, LinkViewMode.large),
-      folderView: pick(kFolderView, FolderViewMode.values, FolderViewMode.list),
       folderSort: pick(kFolderSort, FolderSort.values, FolderSort.name),
       landingTab: pick(kLanding, LandingTab.values, LandingTab.links),
       sort: pick(kSort, LinkSort.values, LinkSort.newest),

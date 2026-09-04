@@ -108,6 +108,19 @@ linkFeedProvider =
       LinkFeedNotifier.new,
     );
 
+/// Board 3f — the pinned section above the count row. Pins are few by
+/// definition, so they are fetched whole rather than paged.
+final FutureProviderFamily<List<LinkWithTags>, FeedScope> pinnedLinksProvider =
+    FutureProvider.family<List<LinkWithTags>, FeedScope>((
+      Ref ref,
+      FeedScope scope,
+    ) {
+      ref.watch(linkChangeSignalProvider);
+      return ref
+          .read(linkRepositoryProvider)
+          .favorites(folderId: scope.folderId, allLinks: scope.allLinks);
+    });
+
 /// Fires whenever anything in `links` changes. Cheap: it reads two aggregates,
 /// not the rows.
 final StreamProvider<int> linkChangeSignalProvider = StreamProvider<int>((

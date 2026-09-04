@@ -3,8 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/db/link_repository.dart';
-import '../../core/db/tag_repository.dart';
 import '../../core/db/search_repository.dart';
+import '../../core/db/tag_repository.dart';
+import '../../core/providers.dart';
 import '../../core/router/router.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/palette.dart';
@@ -12,22 +13,26 @@ import '../../core/theme/tokens.dart';
 import '../../core/theme/typography.dart';
 import '../../core/utils/format.dart';
 import '../../shared/widgets/app_button.dart';
-import '../../shared/widgets/app_icon_button.dart';
+import '../../shared/widgets/app_header.dart';
+import '../../shared/widgets/section_header.dart';
 import '../../shared/widgets/states.dart';
 import '../../shared/widgets/tag_chip.dart';
-import '../add_link/tag_field.dart';
 import '../folders/folder_providers.dart';
 import '../links/links_screen.dart';
 import 'filter_sheet.dart';
 import 'search_controller.dart';
 import 'search_result_tile.dart';
 
-/// Board 1g — a pushed route, not a tab.
+/// Boards 1g and 3e — a pushed route under the one common header.
 ///
-/// An empty query is every link, newest first; typing narrows it live. Each
-/// result carries the folder it lives in.
+/// An empty query is every link, newest first; typing narrows it live. The five
+/// quick chips sit above the results, because they are the filters people
+/// actually reach for.
 class SearchScreen extends ConsumerStatefulWidget {
-  const SearchScreen({super.key});
+  const SearchScreen({this.tagId, super.key});
+
+  /// Opened from a tag: the screen lands with that tag already applied.
+  final int? tagId;
 
   @override
   ConsumerState<SearchScreen> createState() => _SearchScreenState();
@@ -41,6 +46,15 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   void initState() {
     super.initState();
     _scroll.addListener(_onScroll);
+    final int? tag = widget.tagId;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final SearchNotifier notifier = ref.read(searchProvider.notifier);
+      notifier.setFilters(
+        tag == null
+            ? const SearchFilters()
+            : SearchFilters(tagIds: <int>{tag}),
+      );
+    });
   }
 
   @override
@@ -60,7 +74,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final PerchColors c = context.colors;
     final SearchState state = ref.watch(searchProvider);
     final Map<int, String> paths = ref.watch(folderPathsProvider);
 
@@ -68,10 +81,22 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       body: SafeArea(
         child: Column(
           children: <Widget>[
-            _SearchBar(controller: _field),
-            _ControlRow(state: state),
+            AppHeader(title: 'Search', onBack: () => context.pop()),
+            _SearchField(controller: _field),
+            const _QuickChips(),
             if (!state.filters.isEmpty)
               _ActiveFilters(state: state, paths: paths),
+            SectionHeader(
+              label: state.query.isEmpty && state.filters.isEmpty
+                  ? 'Recent · ${grouped(state.total)}'
+                  : '${grouped(state.total)} results',
+              trailing: SortControl(
+                sort: state.filters.sort,
+                onChanged: (LinkSort s) => ref
+                    .read(searchProvider.notifier)
+                    .setFilters(state.filters.copyWith(sort: s)),
+              ),
+            ),
             Expanded(
               child: state.results.isEmpty
                   ? (state.loading
@@ -83,23 +108,16 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                         Space.screen,
                         0,
                         Space.screen,
-                        Space.xl,
+                        Space.bottomSafe,
                       ),
                       itemCount: state.results.length + (state.hasMore ? 1 : 0),
                       separatorBuilder: (BuildContext context, int _) =>
                           const SizedBox(height: Space.sm),
                       itemBuilder: (BuildContext context, int index) {
                         if (index >= state.results.length) {
-                          return Padding(
-                            padding: const EdgeInsets.all(Space.screen),
-                            child: Center(
-                              child: Text(
-                                'Loading more…',
-                                style: PerchType.monoLabel.copyWith(
-                                  color: c.onSurfaceVariant,
-                                ),
-                              ),
-                            ),
+                          return const Padding(
+                            padding: EdgeInsets.all(Space.screen),
+                            child: Center(child: LoadingMore()),
                           );
                         }
                         final LinkWithTags item = state.results[index];
@@ -109,8 +127,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                           location: item.link.folderId == null
                               ? 'Unsorted'
                               : paths[item.link.folderId!] ?? 'Unsorted',
-                          onTap: () =>
-                              context.push(Routes.link(item.link.id)),
+                          onTap: () => context.push(Routes.link(item.link.id)),
                         );
                       },
                     ),
@@ -122,141 +139,121 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   }
 }
 
-class _SearchBar extends ConsumerWidget {
-  const _SearchBar({required this.controller});
+/// The pill with the `Filter` action inside it, exactly as board 3e draws it.
+class _SearchField extends ConsumerWidget {
+  const _SearchField({required this.controller});
 
   final TextEditingController controller;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final PerchColors c = context.colors;
+    final int active = ref.watch(
+      searchProvider.select((SearchState s) => s.filters.activeCount),
+    );
+
     return Padding(
-      padding: const EdgeInsets.fromLTRB(Space.lg, Space.md, Space.lg, Space.row),
-      child: Row(
-        spacing: Space.sm,
-        children: <Widget>[
-          AppIconButton(
-            icon: Icons.arrow_back_rounded,
-            onPressed: () => context.pop(),
-            semanticLabel: 'Back',
-            size: 40,
-          ),
-          Expanded(
-            child: Container(
-              height: 48,
-              padding: const EdgeInsets.symmetric(horizontal: Space.lg),
-              decoration: BoxDecoration(
-                color: c.surfaceContainer,
-                borderRadius: Radii.fullR,
-                border: Border.all(color: c.outline),
-              ),
-              child: Row(
-                spacing: Space.row,
-                children: <Widget>[
-                  Icon(Icons.search_rounded, size: 20, color: c.iconMuted),
-                  Expanded(
-                    child: TextField(
-                      controller: controller,
-                      autofocus: true,
-                      textInputAction: TextInputAction.search,
-                      onChanged: (String v) =>
-                          ref.read(searchProvider.notifier).setQuery(v),
-                      style: PerchType.body.copyWith(color: c.onSurface),
-                      decoration: InputDecoration(
-                        isDense: true,
-                        border: InputBorder.none,
-                        contentPadding: EdgeInsets.zero,
-                        hintText: 'Search all links',
-                        hintStyle: PerchType.body.copyWith(
-                          color: c.onSurfaceMuted,
-                        ),
-                      ),
-                    ),
+      padding: const EdgeInsets.fromLTRB(
+        Space.screen,
+        0,
+        Space.screen,
+        Space.md,
+      ),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        decoration: BoxDecoration(
+          color: c.surfaceContainer,
+          borderRadius: Radii.fullR,
+          border: Border.all(color: c.outline),
+        ),
+        child: Row(
+          spacing: 11,
+          children: <Widget>[
+            Icon(Icons.search_rounded, size: 18, color: c.iconMuted),
+            Expanded(
+              child: TextField(
+                controller: controller,
+                autofocus: true,
+                textInputAction: TextInputAction.search,
+                onChanged: ref.read(searchProvider.notifier).setQuery,
+                style: PerchType.body.copyWith(fontSize: 14, color: c.onSurface),
+                decoration: InputDecoration(
+                  isDense: true,
+                  border: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 6),
+                  hintText: 'Search titles, notes, URLs',
+                  hintStyle: PerchType.body.copyWith(
+                    fontSize: 14,
+                    color: c.onSurfaceMuted,
                   ),
-                  if (controller.text.isNotEmpty)
-                    GestureDetector(
-                      onTap: () {
-                        controller.clear();
-                        ref.read(searchProvider.notifier).setQuery('');
-                      },
-                      child: Icon(
-                        Icons.close_rounded,
-                        size: 18,
-                        color: c.onSurfaceVariant,
-                      ),
-                    ),
-                ],
+                ),
               ),
             ),
-          ),
-        ],
+            AppButton(
+              label: active == 0 ? 'Filter' : 'Filter · $active',
+              type: active == 0
+                  ? AppButtonType.secondary
+                  : AppButtonType.primary,
+              compact: true,
+              onPressed: () => showFilterSheet(context, ref),
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
-/// `Filter · N` and the sort control on the left, the result count on the right.
-class _ControlRow extends ConsumerWidget {
-  const _ControlRow({required this.state});
-
-  final SearchState state;
+/// B5 — Unsorted · Untagged · Unopened · Has note · Favourites, one tap each.
+/// They set the same state the sheet does, so the chips below reflect either
+/// route.
+class _QuickChips extends ConsumerWidget {
+  const _QuickChips();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final PerchColors c = context.colors;
-    final int active = _activeCount(state.filters);
+    final SearchFilters f = ref.watch(
+      searchProvider.select((SearchState s) => s.filters),
+    );
+    final SearchNotifier notifier = ref.read(searchProvider.notifier);
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(Space.screen, 2, Space.screen, Space.md),
-      child: Row(
-        spacing: Space.sm,
+    final List<(String, bool, SearchFilters)> chips =
+        <(String, bool, SearchFilters)>[
+          ('Unsorted', f.unsorted, f.copyWith(unsorted: !f.unsorted)),
+          ('Untagged', f.untagged, f.copyWith(untagged: !f.untagged)),
+          ('Unopened', f.unopened, f.copyWith(unopened: !f.unopened)),
+          (
+            'Has note',
+            f.hasNote == Tri.yes,
+            f.copyWith(hasNote: f.hasNote == Tri.yes ? Tri.any : Tri.yes),
+          ),
+          ('Favourites', f.favorites, f.copyWith(favorites: !f.favorites)),
+        ];
+
+    return SizedBox(
+      height: 46,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.fromLTRB(Space.screen, 0, Space.screen, 0),
         children: <Widget>[
-          AppButton(
-            label: active == 0 ? 'Filter' : 'Filter · $active',
-            type: active == 0 ? AppButtonType.secondary : AppButtonType.primary,
-            compact: true,
-            icon: Icons.tune_rounded,
-            onPressed: () => showFilterSheet(context, ref),
-          ),
-          AppButton(
-            label: '${state.filters.sort.label.split(' ').first} ↓',
-            type: AppButtonType.secondary,
-            compact: true,
-            onPressed: () async {
-              await showSortSheet(context, ref, state.filters.sort);
-              if (!context.mounted) return;
-              ref
-                  .read(searchProvider.notifier)
-                  .setFilters(
-                    state.filters.copyWith(
-                      sort: ref.read(searchProvider).filters.sort,
-                    ),
-                  );
-            },
-          ),
-          const Spacer(),
-          Text(
-            plural(state.total, 'link'),
-            style: PerchType.monoLabel.copyWith(color: c.onSurfaceVariant),
-          ),
+          for (final (String label, bool on, SearchFilters next) in chips)
+            Padding(
+              padding: const EdgeInsets.only(right: 7),
+              child: Center(
+                child: TagChip(
+                  label: label,
+                  selected: on,
+                  onTap: () => notifier.setFilters(next),
+                ),
+              ),
+            ),
         ],
       ),
     );
   }
 }
 
-int _activeCount(SearchFilters f) {
-  int n = 0;
-  if (f.folderId != null) n++;
-  if (f.tagIds.isNotEmpty) n++;
-  if (f.hasNote) n++;
-  if (f.hasImage) n++;
-  if (f.domain != null) n++;
-  if (f.datePreset != DatePreset.anyTime) n++;
-  return n;
-}
-
-/// Every active filter as a removable chip, plus Clear all.
+/// Board 3e — every applied filter becomes a removable chip under the field.
 class _ActiveFilters extends ConsumerWidget {
   const _ActiveFilters({required this.state, required this.paths});
 
@@ -268,13 +265,19 @@ class _ActiveFilters extends ConsumerWidget {
     final PerchColors c = context.colors;
     final SearchFilters f = state.filters;
     final SearchNotifier notifier = ref.read(searchProvider.notifier);
-    final List<String> tagNames = _tagNames(ref, f);
+    final List<TagWithCount> tags =
+        ref.watch(allTagsProvider).valueOrNull ?? const <TagWithCount>[];
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(Space.screen, 0, Space.screen, Space.md),
+      padding: const EdgeInsets.fromLTRB(
+        Space.screen,
+        0,
+        Space.screen,
+        Space.md,
+      ),
       child: Wrap(
-        spacing: 6,
-        runSpacing: 6,
+        spacing: 7,
+        runSpacing: 2,
         crossAxisAlignment: WrapCrossAlignment.center,
         children: <Widget>[
           if (f.folderId != null)
@@ -282,43 +285,71 @@ class _ActiveFilters extends ConsumerWidget {
               label:
                   '${paths[f.folderId!] ?? 'Folder'}'
                   '${f.includeSubfolders ? ' + sub' : ''}',
-              style: ChipStyle.active,
+              selected: true,
               onRemove: () => notifier.setFilters(f.copyWith(clearFolder: true)),
             ),
-          if (tagNames.isNotEmpty)
-            TagChip(
-              label: tagNames.join(
-                f.tagMatch == TagMatch.all ? ' AND ' : ' OR ',
+          for (final TagWithCount t in tags)
+            if (f.tagIds.contains(t.tag.id))
+              TagChip(
+                label: t.tag.name,
+                selected: true,
+                color: c.tagColor(t.tag.color),
+                onRemove: () => notifier.setFilters(
+                  f.copyWith(tagIds: <int>{...f.tagIds}..remove(t.tag.id)),
+                ),
               ),
-              style: ChipStyle.active,
+          for (final String domain in f.domains)
+            TagChip(
+              label: domain,
+              selected: true,
+              onRemove: () => notifier.setFilters(
+                f.copyWith(domains: <String>{...f.domains}..remove(domain)),
+              ),
+            ),
+          if (f.hasNote != Tri.any)
+            TagChip(
+              label: f.hasNote == Tri.yes ? 'Has note' : 'No note',
+              selected: true,
+              onRemove: () => notifier.setFilters(f.copyWith(hasNote: Tri.any)),
+            ),
+          if (f.hasPreview != Tri.any)
+            TagChip(
+              label: f.hasPreview == Tri.yes ? 'Has preview' : 'No preview',
+              selected: true,
               onRemove: () =>
-                  notifier.setFilters(f.copyWith(tagIds: const <int>{})),
-            ),
-          if (f.hasNote)
-            TagChip(
-              label: 'Has note',
-              style: ChipStyle.active,
-              onRemove: () => notifier.setFilters(f.copyWith(hasNote: false)),
-            ),
-          if (f.hasImage)
-            TagChip(
-              label: 'Has preview',
-              style: ChipStyle.active,
-              onRemove: () => notifier.setFilters(f.copyWith(hasImage: false)),
-            ),
-          if (f.domain != null)
-            TagChip(
-              label: f.domain!,
-              style: ChipStyle.active,
-              onRemove: () => notifier.setFilters(f.copyWith(clearDomain: true)),
+                  notifier.setFilters(f.copyWith(hasPreview: Tri.any)),
             ),
           if (f.datePreset != DatePreset.anyTime)
             TagChip(
               label: f.datePreset.label,
-              style: ChipStyle.active,
+              selected: true,
               onRemove: () => notifier.setFilters(
-                f.copyWith(datePreset: DatePreset.anyTime),
+                f.copyWith(datePreset: DatePreset.anyTime, clearRange: true),
               ),
+            ),
+          if (f.unsorted)
+            TagChip(
+              label: 'Unsorted',
+              selected: true,
+              onRemove: () => notifier.setFilters(f.copyWith(unsorted: false)),
+            ),
+          if (f.untagged)
+            TagChip(
+              label: 'Untagged',
+              selected: true,
+              onRemove: () => notifier.setFilters(f.copyWith(untagged: false)),
+            ),
+          if (f.unopened)
+            TagChip(
+              label: 'Unopened',
+              selected: true,
+              onRemove: () => notifier.setFilters(f.copyWith(unopened: false)),
+            ),
+          if (f.favorites)
+            TagChip(
+              label: 'Favourites',
+              selected: true,
+              onRemove: () => notifier.setFilters(f.copyWith(favorites: false)),
             ),
           GestureDetector(
             onTap: notifier.clearFilters,
@@ -326,7 +357,7 @@ class _ActiveFilters extends ConsumerWidget {
             child: Padding(
               padding: const EdgeInsets.symmetric(
                 horizontal: 6,
-                vertical: Space.sm,
+                vertical: Space.md,
               ),
               child: Text(
                 'Clear all',
@@ -339,15 +370,6 @@ class _ActiveFilters extends ConsumerWidget {
         ],
       ),
     );
-  }
-
-  List<String> _tagNames(WidgetRef ref, SearchFilters f) {
-    final List<TagWithCount> tags =
-        ref.watch(allTagsProvider).valueOrNull ?? const <TagWithCount>[];
-    return tags
-        .where((TagWithCount t) => f.tagIds.contains(t.tag.id))
-        .map((TagWithCount t) => t.tag.name)
-        .toList(growable: false);
   }
 }
 
@@ -415,7 +437,8 @@ class _NoResults extends ConsumerWidget {
                 children: <Widget>[
                   AppButton(
                     label: 'Search everywhere',
-                    onPressed: ref.read(searchProvider.notifier).searchEverywhere,
+                    onPressed:
+                        ref.read(searchProvider.notifier).searchEverywhere,
                   ),
                   AppButton(
                     label: 'Clear filters',

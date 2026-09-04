@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../db/database.dart';
+import '../providers.dart';
 import '../utils/url.dart';
 import 'link_saver.dart';
 
@@ -41,8 +43,10 @@ class ShareHandler {
   final Ref _ref;
   StreamSubscription<String>? _subscription;
 
-  /// Emits the id of each link saved from a share, so the UI can confirm it.
-  final StreamController<int> saved = StreamController<int>.broadcast();
+  /// Emits each share outcome, so the UI can confirm it — or, when the URL was
+  /// already saved, say so instead (B6).
+  final StreamController<ShareResult> saved =
+      StreamController<ShareResult>.broadcast();
 
   Future<void> start() async {
     const ShareIntake intake = ShareIntake();
@@ -52,16 +56,36 @@ class ShareHandler {
   }
 
   Future<void> _handle(String text) async {
-    final String? url = extractUrl(text);
-    if (url == null) return;
+    final String? extracted = extractUrl(text);
+    if (extracted == null) return;
+    final String url = normalizeUrl(extracted);
+
+    // B6 — a share of something already saved confirms the existing link
+    // rather than quietly making a second copy.
+    final Link? existing = await _ref.read(linkRepositoryProvider).byUrl(url);
+    if (existing != null) {
+      if (!saved.isClosed) {
+        saved.add(ShareResult(id: existing.id, duplicate: true));
+      }
+      return;
+    }
+
     final int id = await _ref.read(linkSaverProvider).save(url: url);
-    if (!saved.isClosed) saved.add(id);
+    if (!saved.isClosed) saved.add(ShareResult(id: id));
   }
 
   void dispose() {
     unawaited(_subscription?.cancel());
     unawaited(saved.close());
   }
+}
+
+/// What a share turned into.
+class ShareResult {
+  const ShareResult({required this.id, this.duplicate = false});
+
+  final int id;
+  final bool duplicate;
 }
 
 final Provider<ShareHandler> shareHandlerProvider = Provider<ShareHandler>((
