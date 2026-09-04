@@ -1,6 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Only permission Perch needs: fetching link metadata directly from the saved site. -->
+    <!-- Permissions for fetching link metadata and checking network connectivity. -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
 
     <application
         android:label="Perch"
