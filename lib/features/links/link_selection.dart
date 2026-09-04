@@ -42,17 +42,16 @@ class LinkSelectionNotifier extends Notifier<LinkSelection> {
 }
 
 final NotifierProvider<LinkSelectionNotifier, LinkSelection>
-linkSelectionProvider =
-    NotifierProvider<LinkSelectionNotifier, LinkSelection>(
-      LinkSelectionNotifier.new,
-    );
+linkSelectionProvider = NotifierProvider<LinkSelectionNotifier, LinkSelection>(
+  LinkSelectionNotifier.new,
+);
 
 /// Board 3f — selection is a mode, and back is how you leave a mode.
 ///
-/// `PopScope` is no use here: go_router's shell gives each tab its own
-/// Navigator, and the back press never reaches the branch route's pop
-/// disposition — it just finishes the activity. `BackButtonListener` hooks the
-/// Router's own dispatcher, which does see it first.
+/// Two scopes are needed. Android 13+ only routes back into Dart when the
+/// *root* navigator says the framework handles it, so [NavShell] carries one;
+/// this one sits inside the tab so a back press also cancels the selection
+/// rather than popping a folder off that branch.
 class SelectionScope extends ConsumerWidget {
   const SelectionScope({required this.child, super.key});
 
@@ -63,11 +62,10 @@ class SelectionScope extends ConsumerWidget {
     final bool active = ref.watch(
       linkSelectionProvider.select((LinkSelection s) => s.active),
     );
-    if (!active) return child;
-    return BackButtonListener(
-      onBackButtonPressed: () async {
-        ref.read(linkSelectionProvider.notifier).clear();
-        return true;
+    return PopScope(
+      canPop: !active,
+      onPopInvokedWithResult: (bool didPop, Object? _) {
+        if (!didPop) ref.read(linkSelectionProvider.notifier).clear();
       },
       child: child,
     );

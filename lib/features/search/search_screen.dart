@@ -79,9 +79,13 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
     return Scaffold(
       body: SafeArea(
+        bottom: false,
         child: Column(
           children: <Widget>[
-            AppHeader(title: 'Search', onBack: () => context.pop()),
+            AppHeader(
+              title: 'Search',
+              onBack: context.canPop() ? () => context.pop() : null,
+            ),
             _SearchField(controller: _field),
             const _QuickChips(),
             if (!state.filters.isEmpty)

@@ -23,7 +23,7 @@ class NavDestination {
 const List<NavDestination> kDestinations = <NavDestination>[
   NavDestination(PerchGlyph.links, 'Links'),
   NavDestination(PerchGlyph.folders, 'Folders'),
-  NavDestination(PerchGlyph.stats, 'Stats'),
+  NavDestination(PerchGlyph.search, 'Search'),
   NavDestination(PerchGlyph.more, 'More'),
 ];
 

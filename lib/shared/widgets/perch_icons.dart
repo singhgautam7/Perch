@@ -8,7 +8,7 @@ import '../../core/theme/tokens.dart';
 ///
 /// Everything else in the app uses Material Symbols Rounded, which is the same
 /// drawing language at the same weight.
-enum PerchGlyph { links, folders, stats, more }
+enum PerchGlyph { links, folders, search, stats, more }
 
 class PerchIcon extends StatelessWidget {
   const PerchIcon(
@@ -37,6 +37,7 @@ class PerchIcon extends StatelessWidget {
         child: switch (glyph) {
           PerchGlyph.links => _Links(color: color),
           PerchGlyph.folders => _Folder(color: color, filled: filled),
+          PerchGlyph.search => _Search(color: color),
           PerchGlyph.stats => _Stats(color: color),
           PerchGlyph.more => _More(
             color: color,
@@ -108,6 +109,55 @@ class _Folder extends StatelessWidget {
       ),
     );
   }
+}
+
+/// A magnifying glass — rounded rim and diagonal handle.
+class _Search extends StatelessWidget {
+  const _Search({required this.color});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      size: const Size(20, 16),
+      painter: _SearchPainter(color),
+    );
+  }
+}
+
+class _SearchPainter extends CustomPainter {
+  _SearchPainter(this.color);
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final Paint paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = IconSpec.stroke
+      ..strokeCap = StrokeCap.round;
+
+    final Offset center = Offset(size.width * 0.42, size.height * 0.44);
+    const double radius = 5.2;
+    canvas.drawCircle(center, radius, paint);
+
+    const double cos45 = 0.70710678;
+    const double sin45 = 0.70710678;
+    final Offset start = Offset(
+      center.dx + radius * cos45,
+      center.dy + radius * sin45,
+    );
+    final Offset end = Offset(
+      center.dx + (radius + 4.5) * cos45,
+      center.dy + (radius + 4.5) * sin45,
+    );
+    canvas.drawLine(start, end, paint);
+  }
+
+  @override
+  bool shouldRepaint(_SearchPainter oldDelegate) => oldDelegate.color != color;
 }
 
 /// Three bars, bottom-aligned.

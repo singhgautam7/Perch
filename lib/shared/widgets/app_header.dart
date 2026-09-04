@@ -9,7 +9,7 @@ import 'app_icon_button.dart';
 /// Board 3a — the one header. Links, Folders, Search, Stats, More, Add/Edit,
 /// Link detail and every settings sub-page use this and nothing else.
 ///
-/// Left: an optional back button then the screen title in Instrument Serif 26.
+/// Left: an optional back button then the screen title in Instrument Sans 22.
 /// Right: up to four identical circular icon-buttons, 8dp apart. Margins are
 /// fixed — 20dp side, 14dp above the title, 12dp below the header — so nothing
 /// about this block differs between screens.

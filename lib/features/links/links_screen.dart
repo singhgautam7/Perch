@@ -58,11 +58,6 @@ class LinksScreen extends ConsumerWidget {
                   AppHeader(
                     title: 'Links',
                     actions: <Widget>[
-                      AppIconButton(
-                        icon: Icons.search_rounded,
-                        onPressed: () => context.push(Routes.search),
-                        semanticLabel: 'Search links',
-                      ),
                       ViewModeButton(
                         mode: mode,
                         onChanged: (LinkViewMode m) =>
@@ -187,7 +182,7 @@ Future<void> showSortSheet(
 /// Board 3a names the slot but does not spell out its contents; it carries the
 /// two behaviours that otherwise have only one entry point — sorting, and the
 /// way into multi-select without holding a card.
-enum _ListMenu { sort, select }
+enum _ListMenu { sort, select, stats }
 
 class ListOverflowButton extends ConsumerWidget {
   const ListOverflowButton({required this.sort, this.extra, super.key});
@@ -213,6 +208,10 @@ class ListOverflowButton extends ConsumerWidget {
                 value: _ListMenu.select,
                 label: 'Select links',
               ),
+              AppMenuEntry<_ListMenu>(
+                value: _ListMenu.stats,
+                label: 'Stats',
+              ),
             ],
           );
           if (picked == null || !context.mounted) return;
@@ -221,6 +220,8 @@ class ListOverflowButton extends ConsumerWidget {
               await showSortSheet(context, ref, sort);
             case _ListMenu.select:
               ref.read(linkSelectionProvider.notifier).enter();
+            case _ListMenu.stats:
+              await context.push(Routes.stats);
           }
         },
       ),

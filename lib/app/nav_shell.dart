@@ -30,16 +30,32 @@ class NavShell extends ConsumerStatefulWidget {
 }
 
 class _NavShellState extends ConsumerState<NavShell>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late final AnimationController _hide = AnimationController(
     vsync: this,
     duration: Motion.navHide,
   );
+  late final AnimationController _page = AnimationController(
+    vsync: this,
+    duration: Motion.containerTransform,
+    value: 1.0,
+  );
   double _lastOffset = 0;
+  bool _forward = true;
+
+  @override
+  void didUpdateWidget(NavShell oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.index != oldWidget.index) {
+      _forward = widget.index > oldWidget.index;
+      _page.forward(from: 0.0);
+    }
+  }
 
   @override
   void dispose() {
     _hide.dispose();
+    _page.dispose();
     super.dispose();
   }
 
@@ -73,55 +89,86 @@ class _NavShellState extends ConsumerState<NavShell>
   @override
   Widget build(BuildContext context) {
     final bool reduced = Motion.reduced(context);
+    final Animation<double> pageCurved = CurvedAnimation(
+      parent: _page,
+      curve: Motion.curveOf(context, Motion.decelerate),
+    );
     // Board 3f — the bulk action bar takes the pill's place while selecting.
     final bool selecting = ref.watch(
       linkSelectionProvider.select((LinkSelection s) => s.active),
     );
-    return Scaffold(
-      body: NotificationListener<ScrollNotification>(
-        onNotification: _onScroll,
-        child: Stack(
-          children: <Widget>[
-            GestureDetector(
-              onHorizontalDragEnd: _onHorizontalFling,
-              // Transparent, not opaque: the pages underneath still get their
-              // own taps and vertical drags.
-              behavior: HitTestBehavior.translucent,
-              child: widget.child,
-            ),
-            if (!selecting)
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 22,
-                child: RepaintBoundary(
-                  child: AnimatedBuilder(
-                    animation: _hide,
-                    builder: (BuildContext context, Widget? child) {
-                      final double t = _hide.value;
-                      return Opacity(
-                        opacity: 1 - t,
-                        child: Transform.translate(
-                          offset: Offset(0, reduced ? 0 : 72 * t),
-                          child: IgnorePointer(ignoring: t > 0.5, child: child),
-                        ),
-                      );
-                    },
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      spacing: Space.row,
-                      children: <Widget>[
-                        PerchNavPill(
-                          index: widget.index,
-                          onSelect: widget.onSelect,
-                        ),
-                        PerchFab(onTap: widget.onAdd),
-                      ],
+    return PopScope(
+      // The root route's disposition is what tells Android that Flutter will
+      // handle the back press at all; without this the activity just finishes.
+      canPop: !selecting,
+      onPopInvokedWithResult: (bool didPop, Object? _) {
+        if (!didPop) ref.read(linkSelectionProvider.notifier).clear();
+      },
+      child: Scaffold(
+        body: NotificationListener<ScrollNotification>(
+          onNotification: _onScroll,
+          child: Stack(
+            children: <Widget>[
+              GestureDetector(
+                onHorizontalDragEnd: _onHorizontalFling,
+                // Transparent, not opaque: the pages underneath still get their
+                // own taps and vertical drags.
+                behavior: HitTestBehavior.translucent,
+                child: ClipRect(
+                  child: RepaintBoundary(
+                    child: AnimatedBuilder(
+                      animation: pageCurved,
+                      builder: (BuildContext context, Widget? child) {
+                        final double t = pageCurved.value;
+                        if (t == 1.0 || reduced) return child!;
+                        final double dx = _forward ? (1.0 - t) : -(1.0 - t);
+                        return FractionalTranslation(
+                          translation: Offset(dx, 0.0),
+                          child: child,
+                        );
+                      },
+                      child: widget.child,
                     ),
                   ),
                 ),
               ),
-          ],
+              if (!selecting)
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 22,
+                  child: RepaintBoundary(
+                    child: AnimatedBuilder(
+                      animation: _hide,
+                      builder: (BuildContext context, Widget? child) {
+                        final double t = _hide.value;
+                        return Opacity(
+                          opacity: 1 - t,
+                          child: Transform.translate(
+                            offset: Offset(0, reduced ? 0 : 72 * t),
+                            child: IgnorePointer(
+                              ignoring: t > 0.5,
+                              child: child,
+                            ),
+                          ),
+                        );
+                      },
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        spacing: Space.row,
+                        children: <Widget>[
+                          PerchNavPill(
+                            index: widget.index,
+                            onSelect: widget.onSelect,
+                          ),
+                          PerchFab(onTap: widget.onAdd),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );

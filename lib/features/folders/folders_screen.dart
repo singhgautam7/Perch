@@ -87,12 +87,6 @@ class FoldersScreen extends ConsumerWidget {
                                       : Routes.folder(folder!.parentId!),
                                 ),
                     actions: <Widget>[
-                      AppIconButton(
-                        icon: Icons.search_rounded,
-                        onPressed: () => context.push(Routes.search),
-                        semanticLabel: 'Search links',
-                        tint: tinted ? tint.onContainer : null,
-                      ),
                       ViewModeButton(
                         mode: settings.viewMode,
                         onChanged: (LinkViewMode m) =>

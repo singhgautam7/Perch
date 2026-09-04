@@ -9,6 +9,7 @@ import '../../core/theme/tokens.dart';
 import '../../core/theme/typography.dart';
 import '../../core/utils/format.dart';
 import '../../core/utils/url.dart';
+import '../../shared/widgets/app_header.dart';
 import '../../shared/widgets/states.dart';
 import 'stats_providers.dart';
 
@@ -19,40 +20,46 @@ class StatsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final PerchColors c = context.colors;
     final AsyncValue<PerchStats> stats = ref.watch(statsProvider);
 
-    return SafeArea(
-      bottom: false,
-      child: stats.when(
-        loading: () => const SizedBox.shrink(),
-        error: (Object e, StackTrace _) => ErrorStateView(message: '$e'),
-        data: (PerchStats s) => ListView(
-          padding: const EdgeInsets.fromLTRB(
-            Space.screen,
-            0,
-            Space.screen,
-            Space.bottomSafe,
-          ),
+    return Scaffold(
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
-            Padding(
-              padding: const EdgeInsets.fromLTRB(0, 14, 0, Space.lg),
-              child: Text(
-                'Stats',
-                style: PerchType.title.copyWith(
-                  fontSize: 22,
-                  color: c.onSurface,
+            AppHeader(
+              title: 'Stats',
+              onBack: () => context.pop(),
+            ),
+            Expanded(
+              child: stats.when(
+                loading: () => const SizedBox.shrink(),
+                error: (Object e, StackTrace _) => ErrorStateView(message: '$e'),
+                data: (PerchStats s) => ListView(
+                padding: const EdgeInsets.fromLTRB(
+                  Space.screen,
+                  0,
+                  Space.screen,
+                  Space.bottomSafe,
                 ),
-              ),
-            ),
-            Row(
-              spacing: Space.sm,
-              children: <Widget>[
-                Expanded(child: _Count(value: s.links, label: 'Links', big: true)),
-                Expanded(child: _Count(value: s.folders, label: 'Folders')),
-                Expanded(child: _Count(value: s.tags, label: 'Tags')),
-              ],
-            ),
+                children: <Widget>[
+                  Row(
+                    spacing: Space.sm,
+                    children: <Widget>[
+                      Expanded(
+                        child: _Count(
+                          value: s.links,
+                          label: 'Links',
+                          big: true,
+                        ),
+                      ),
+                      Expanded(
+                        child: _Count(value: s.folders, label: 'Folders'),
+                      ),
+                      Expanded(child: _Count(value: s.tags, label: 'Tags')),
+                    ],
+                  ),
             const SizedBox(height: Space.md),
             _Card(
               title: 'Saved per week',
@@ -94,12 +101,16 @@ class StatsScreen extends ConsumerWidget {
                 action: 'saved ${shortAge(s.oldestUnopened!.createdAt)} ago',
                 onTap: () => context.push(Routes.link(s.oldestUnopened!.id)),
               ),
-            ],
-          ],
+                ],
+              ],
+            ),
+          ),
         ),
-      ),
-    );
-  }
+      ],
+    ),
+  ),
+);
+}
 }
 
 class _Count extends StatelessWidget {

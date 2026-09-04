@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/db/database.dart';
 import '../../core/providers.dart';
+import '../../core/router/router.dart';
 import '../../core/theme/tokens.dart';
 import '../../shared/widgets/app_bottom_sheet.dart';
 import '../../shared/widgets/app_button.dart';
@@ -12,7 +14,7 @@ import '../../shared/widgets/labelled_field.dart';
 import 'folder_picker.dart';
 
 /// Board 3i — the folder menu: rename, recolour, move, delete.
-enum FolderAction { rename, color, move, delete }
+enum FolderAction { rename, color, move, stats, delete }
 
 Future<void> showFolderMenu(
   BuildContext context,
@@ -33,6 +35,7 @@ Future<void> showFolderMenu(
         label: 'Change colour',
       ),
       AppMenuEntry<FolderAction>(value: FolderAction.move, label: 'Move'),
+      AppMenuEntry<FolderAction>(value: FolderAction.stats, label: 'Stats'),
       AppMenuEntry<FolderAction>.divider(),
       AppMenuEntry<FolderAction>(
         value: FolderAction.delete,
@@ -50,6 +53,8 @@ Future<void> showFolderMenu(
       await _recolor(context, ref, folder);
     case FolderAction.move:
       await _move(context, ref, folder);
+    case FolderAction.stats:
+      await context.push(Routes.stats);
     case FolderAction.delete:
       await _confirmDelete(context, ref, folder);
   }

@@ -73,11 +73,8 @@ GoRouter buildRouter({required AppSettings settings}) {
         },
       ),
       GoRoute(
-        path: Routes.search,
-        builder: (BuildContext c, GoRouterState s) {
-          final String? tag = s.uri.queryParameters['tag'];
-          return SearchScreen(tagId: tag == null ? null : int.tryParse(tag));
-        },
+        path: Routes.stats,
+        builder: (BuildContext c, GoRouterState s) => const StatsScreen(),
       ),
       // Settings sub-pages are full screens with their own back, so they sit
       // above the shell rather than inside a branch.
@@ -161,9 +158,13 @@ GoRouter buildRouter({required AppSettings settings}) {
           StatefulShellBranch(
             routes: <RouteBase>[
               GoRoute(
-                path: Routes.stats,
-                builder: (BuildContext c, GoRouterState s) =>
-                    const StatsScreen(),
+                path: Routes.search,
+                builder: (BuildContext c, GoRouterState s) {
+                  final String? tag = s.uri.queryParameters['tag'];
+                  return SearchScreen(
+                    tagId: tag == null ? null : int.tryParse(tag),
+                  );
+                },
               ),
             ],
           ),

@@ -11,6 +11,7 @@ import '../../core/theme/tokens.dart';
 import '../../core/theme/typography.dart';
 import '../../core/router/router.dart';
 import '../../shared/widgets/app_bottom_sheet.dart';
+import '../../shared/widgets/app_header.dart';
 import '../../shared/widgets/perch_icons.dart';
 import '../../shared/widgets/view_mode_button.dart';
 import '../stats/stats_providers.dart';
@@ -30,75 +31,76 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final PerchColors c = context.colors;
     final AppSettings s = ref.watch(settingsProvider);
     final SettingsController controller = ref.read(settingsProvider.notifier);
     final int? tagCount = ref.watch(statsProvider).valueOrNull?.tags;
 
     return SafeArea(
       bottom: false,
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(
-          Space.screen,
-          0,
-          Space.screen,
-          Space.bottomSafe,
-        ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          Padding(
-            padding: const EdgeInsets.fromLTRB(0, 14, 0, Space.lg),
-            child: Text(
-              'More',
-              style: PerchType.title.copyWith(fontSize: 22, color: c.onSurface),
-            ),
-          ),
+          const AppHeader(title: 'More'),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(
+                Space.screen,
+                0,
+                Space.screen,
+                Space.bottomSafe,
+              ),
+              children: <Widget>[
+                SettingsGroup(
+                  label: 'General',
+                  children: <Widget>[
+                    SettingsRow(
+                      icon: Icons.flag_outlined,
+                      label: 'Open on launch',
+                      value: s.landingTab == LandingTab.folders ? 'Folders' : 'Links',
+                      onTap: () => _pickLandingTab(s, controller),
+                    ),
+                    SettingsRow(
+                      icon: Icons.view_agenda_outlined,
+                      label: 'Default view mode',
+                      value: s.viewMode.label,
+                      onTap: () => _pickViewMode(s, controller),
+                    ),
+                    SettingsRow(
+                      icon: Icons.palette_outlined,
+                      label: 'Appearance',
+                      value: '${s.family.name} · ${_modeLabel(s.themeMode)}',
+                      onTap: () => context.push(Routes.appearance),
+                    ),
+                  ],
+                ),
 
-          SettingsGroup(
-            label: 'General',
-            children: <Widget>[
-              SettingsRow(
-                icon: Icons.flag_outlined,
-                label: 'Open on launch',
-                value: s.landingTab == LandingTab.folders ? 'Folders' : 'Links',
-                onTap: () => _pickLandingTab(s, controller),
-              ),
-              SettingsRow(
-                icon: Icons.view_agenda_outlined,
-                label: 'Default view mode',
-                value: s.viewMode.label,
-                onTap: () => _pickViewMode(s, controller),
-              ),
-              SettingsRow(
-                icon: Icons.palette_outlined,
-                label: 'Appearance',
-                value: '${s.family.name} · ${_modeLabel(s.themeMode)}',
-                onTap: () => context.push(Routes.appearance),
-              ),
-            ],
-          ),
-
-          SettingsGroup(
-            label: 'Your data',
-            children: <Widget>[
-              // Board 3g — Import / Export becomes Data, next to Tags.
-              SettingsRow(
-                icon: Icons.swap_vert_rounded,
-                label: 'Data',
-                onTap: () => context.push(Routes.data),
-              ),
-              SettingsRow(
-                icon: Icons.sell_outlined,
-                label: 'Tags',
-                value: tagCount == null ? null : '$tagCount',
-                onTap: () => context.push(Routes.tags),
-              ),
-              SettingsRow(
-                icon: Icons.key_outlined,
-                label: 'Permissions',
-                onTap: () => context.push(Routes.permissions),
-              ),
-            ],
-          ),
+                SettingsGroup(
+                  label: 'Your data',
+                  children: <Widget>[
+                    // Board 3g — Import / Export becomes Data, next to Tags.
+                    SettingsRow(
+                      icon: Icons.swap_vert_rounded,
+                      label: 'Data',
+                      onTap: () => context.push(Routes.data),
+                    ),
+                    SettingsRow(
+                      icon: Icons.sell_outlined,
+                      label: 'Tags',
+                      value: tagCount == null ? null : '$tagCount',
+                      onTap: () => context.push(Routes.tags),
+                    ),
+                    SettingsRow(
+                      icon: Icons.bar_chart_rounded,
+                      label: 'Stats',
+                      onTap: () => context.push(Routes.stats),
+                    ),
+                    SettingsRow(
+                      icon: Icons.key_outlined,
+                      label: 'Permissions',
+                      onTap: () => context.push(Routes.permissions),
+                    ),
+                  ],
+                ),
 
           SettingsGroup(
             label: 'About Perch',
@@ -154,8 +156,11 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
           ),
         ],
       ),
-    );
-  }
+    ),
+  ],
+),
+);
+}
 
   /// Which tab Perch opens on. Two choices do not earn a screen — they get the
   /// shared option sheet, like every other single choice in the app.
