@@ -8,8 +8,9 @@ import '../../core/theme/typography.dart';
 import '../../shared/widgets/folder_card.dart';
 import '../../shared/widgets/tag_chip.dart';
 
-/// The wash behind the hero — three soft radial lifts in blue, violet and
-/// cyan. It is the one place in the app with a gradient.
+/// The wash behind the hero — three soft radial lifts: the theme's accent hue
+/// and its neighbours 35° either side (blue, violet and cyan on Indigo). It is
+/// the one place in the app with a gradient.
 class HeroGlow extends StatelessWidget {
   const HeroGlow({super.key});
 
@@ -19,6 +20,7 @@ class HeroGlow extends StatelessWidget {
     // The dark theme takes the same hues at lower lightness, so the wash reads
     // as light spilling in rather than as a grey film.
     final double l = dark ? 0.42 : 0.72;
+    final double hue = context.colors.accentHue;
 
     return IgnorePointer(
       child: RepaintBoundary(
@@ -38,17 +40,17 @@ class HeroGlow extends StatelessWidget {
                 (
                   const Alignment(-0.48, -0.32),
                   0.52,
-                  Oklch(l, 0.14, 265, dark ? 0.5 : 0.55).toColor(),
+                  Oklch(l, 0.14, hue, dark ? 0.5 : 0.55).toColor(),
                 ),
                 (
                   const Alignment(0.48, -0.60),
                   0.44,
-                  Oklch(l + 0.08, 0.10, 300, dark ? 0.4 : 0.45).toColor(),
+                  Oklch(l + 0.08, 0.10, hue + 35, dark ? 0.4 : 0.45).toColor(),
                 ),
                 (
                   const Alignment(0.08, 0.30),
                   0.46,
-                  Oklch(l + 0.16, 0.07, 230, dark ? 0.36 : 0.5).toColor(),
+                  Oklch(l + 0.16, 0.07, hue - 35, dark ? 0.36 : 0.5).toColor(),
                 ),
               ],
             ),

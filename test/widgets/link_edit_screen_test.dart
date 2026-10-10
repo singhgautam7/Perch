@@ -41,7 +41,7 @@ void main() {
         settingsRepositoryProvider.overrideWithValue(settingsRepo),
       ],
       child: MaterialApp(
-        theme: AppTheme.of(ThemeFamily.perch, Tone.light),
+        theme: AppTheme.of(ThemeFamily.indigo, Tone.light),
         home: LinkEditScreen(initialFolderId: initialFolderId),
       ),
     );

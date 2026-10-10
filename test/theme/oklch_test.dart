@@ -1,6 +1,7 @@
 import 'dart:ui';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:perch/core/db/settings_repository.dart';
 import 'package:perch/core/theme/oklch.dart';
 import 'package:perch/core/theme/palette.dart';
 
@@ -30,12 +31,21 @@ void main() {
   });
 
   test('dark surfaces are dark and dark text is light', () {
-    final PerchColors dark = ThemeFamily.perch.colors(Tone.dark);
+    final PerchColors dark = ThemeFamily.indigo.colors(Tone.dark);
     expect(dark.surface.computeLuminance(), lessThan(0.1));
     expect(dark.onSurface.computeLuminance(), greaterThan(0.7));
 
-    final PerchColors light = ThemeFamily.perch.colors(Tone.light);
+    final PerchColors light = ThemeFamily.indigo.colors(Tone.light);
     expect(light.surface.computeLuminance(), greaterThan(0.9));
     expect(light.onSurface.computeLuminance(), lessThan(0.1));
+  });
+
+  test('Perch is the icon purple by default; a saved perch keeps the blue', () {
+    expect(const AppSettings().family, same(ThemeFamily.perch));
+    expect(hex(ThemeFamily.perch.colors(Tone.light).primary), '#8b5dce');
+    // Before the icon purple, `perch` was the blue family; whoever saved it
+    // picked that blue, so it must still resolve to it.
+    expect(ThemeFamily.byId('perch'), same(ThemeFamily.indigo));
+    expect(ThemeFamily.byId('gone'), same(ThemeFamily.perch));
   });
 }
