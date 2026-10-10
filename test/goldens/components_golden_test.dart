@@ -20,7 +20,7 @@ Widget frame(Widget child, Tone tone) {
   // no database is touched until something is written.
   return ProviderScope(
     child: MaterialApp(
-      theme: AppTheme.of(ThemeFamily.perch, tone),
+      theme: AppTheme.of(ThemeFamily.indigo, tone),
       debugShowCheckedModeBanner: false,
       // A Scaffold, because every one of these components is only ever drawn
       // inside one — InkWell needs the Material.

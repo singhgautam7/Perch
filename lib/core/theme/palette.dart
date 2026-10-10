@@ -369,7 +369,8 @@ class FolderTint {
 enum Tone { light, dark, amoled }
 
 /// One accent family. Board 1a ships four plus Android dynamic color; the two
-/// browse-heavy families (Perch, Slate) also ship AMOLED.
+/// browse-heavy families (Perch, Slate) also ship AMOLED. Perch has since moved
+/// to the app icon's purple; the board's original blue stays on as Indigo.
 @immutable
 class ThemeFamily {
   const ThemeFamily({
@@ -402,10 +403,27 @@ class ThemeFamily {
   final double primaryContainerChroma;
   final bool hasAmoled;
 
+  /// The app icon's purple: its mid stroke, `#8B5DCE`, is the light primary
+  /// (`specs/design/app-icon/icon.md`). A new id, so a saved `perch`, which
+  /// is [indigo], keeps the blue its owner picked.
   static const ThemeFamily perch = ThemeFamily(
-    id: 'perch',
+    id: 'violet',
     name: 'Perch',
     blurb: 'default',
+    neutralHue: 300,
+    neutralChroma: 1,
+    primaryHue: 300,
+    primaryLightness: 0.58,
+    primaryChroma: 0.17,
+    primaryContainerChroma: 0.045,
+    hasAmoled: true,
+  );
+
+  /// Board 1a's original Perch blue, under its original id.
+  static const ThemeFamily indigo = ThemeFamily(
+    id: 'perch',
+    name: 'Indigo',
+    blurb: 'blue',
     neutralHue: 265,
     neutralChroma: 1,
     primaryHue: 265,
@@ -454,7 +472,13 @@ class ThemeFamily {
     hasAmoled: true,
   );
 
-  static const List<ThemeFamily> all = <ThemeFamily>[perch, ember, fern, slate];
+  static const List<ThemeFamily> all = <ThemeFamily>[
+    perch,
+    indigo,
+    ember,
+    fern,
+    slate,
+  ];
 
   static ThemeFamily byId(String id) =>
       all.firstWhere((ThemeFamily f) => f.id == id, orElse: () => perch);

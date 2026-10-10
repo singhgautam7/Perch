@@ -52,7 +52,7 @@ enum FolderSort {
 @immutable
 class AppSettings {
   const AppSettings({
-    this.familyId = 'perch',
+    this.familyId = 'violet',
     this.themeMode = ThemeMode.system,
     this.amoled = false,
     this.dynamicColor = false,
@@ -156,7 +156,7 @@ class SettingsRepository {
     }
 
     return AppSettings(
-      familyId: m[kFamily] ?? 'perch',
+      familyId: m[kFamily] ?? 'violet',
       themeMode: pick(kMode, ThemeMode.values, ThemeMode.system),
       amoled: m[kAmoled] == 'true',
       dynamicColor: m[kDynamic] == 'true',

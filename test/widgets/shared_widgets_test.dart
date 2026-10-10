@@ -8,7 +8,7 @@ import 'package:perch/shared/widgets/breadcrumb.dart';
 import 'package:perch/shared/widgets/tag_chip.dart';
 
 Widget host(Widget child, {Tone tone = Tone.light}) => MaterialApp(
-  theme: AppTheme.of(ThemeFamily.perch, tone),
+  theme: AppTheme.of(ThemeFamily.indigo, tone),
   home: Scaffold(body: Center(child: child)),
 );
 
